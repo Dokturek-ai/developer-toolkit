@@ -1,0 +1,16 @@
+{
+  "description": "medplum-mcp: každé volání fhir-request s jinou metodou než GET vyžaduje potvrzení uživatelem.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "mcp__plugin_medplum-mcp_medplum-dev__fhir-request",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/confirm-writes.sh\""
+          }
+        ]
+      }
+    ]
+  }
+}

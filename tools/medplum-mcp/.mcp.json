@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "medplum-dev": {
+      "type": "http",
+      "url": "https://medplum.test.dokturek.ai/mcp/stream",
+      "oauth": {
+        "clientId": "dokturek-claude-code-dev",
+        "callbackPort": 1458,
+        "scopes": "openid profile"
+      }
+    }
+  }
+}

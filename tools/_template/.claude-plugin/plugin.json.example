@@ -1,0 +1,10 @@
+{
+  "name": "nazev-nastroje",
+  "version": "0.1.0",
+  "description": "Co nástroj dělá, na jaké prostředí míří a jestli zapisuje.",
+  "author": {
+    "name": "Doktůrek.ai"
+  },
+  "repository": "https://github.com/Dokturek-ai/developer-toolkit",
+  "keywords": []
+}

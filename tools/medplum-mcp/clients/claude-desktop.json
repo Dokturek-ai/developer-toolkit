@@ -1,0 +1,21 @@
+{
+  "mcpServers": {
+    "dokturek-medplum-dev": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote@0.14.3",
+        "https://medplum.test.dokturek.ai/mcp/stream",
+        "1458",
+        "--host",
+        "localhost",
+        "--callback-path",
+        "/callback",
+        "--static-oauth-client-info",
+        "{\"client_id\":\"dokturek-claude-code-dev\"}",
+        "--static-oauth-client-metadata",
+        "{\"scope\":\"openid profile\"}"
+      ]
+    }
+  }
+}

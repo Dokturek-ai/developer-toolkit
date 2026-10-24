@@ -1,0 +1,10 @@
+{
+  "name": "medplum-mcp",
+  "version": "0.1.0",
+  "description": "MCP přístup k Medplum FHIR API v prostředí Doktůrek dev-pre-production přes osobní OAuth přihlášení. Čtení i zápis; každý zápis vyžaduje potvrzení.",
+  "author": {
+    "name": "Doktůrek.ai"
+  },
+  "repository": "https://github.com/Dokturek-ai/developer-toolkit",
+  "keywords": ["medplum", "fhir", "mcp", "oauth"]
+}

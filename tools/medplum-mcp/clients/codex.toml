@@ -1,0 +1,12 @@
+# Codex CLI — přidej do ~/.codex/config.toml.
+# Codex se registruje přes DCR jako klient dokturek-codex-dev.
+# ID na konci callback_url je odvozené z URL serveru
+# (prvních 9 bajtů SHA-256 v base64url), je stejné pro všechny.
+# Po přidání: codex mcp login dokturek-medplum-dev --oauth-client-registration dcr --scopes openid,profile
+
+[mcp_servers.dokturek-medplum-dev]
+url = "https://medplum.test.dokturek.ai/mcp/stream"
+
+[mcp_servers.dokturek-medplum-dev.oauth]
+callback_port = 1457
+callback_url = "http://127.0.0.1:1457/callback/uAEkM6bonMJI"

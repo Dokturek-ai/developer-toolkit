@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "dokturek-dev-toolkit",
+  "owner": {
+    "name": "Doktůrek.ai (Clementine Solutions s.r.o.)",
+    "url": "https://github.com/Dokturek-ai"
+  },
+  "description": "Vývojářské nástroje core týmu Doktůrek.ai s přístupem k datům a k Medplumu. Není to běžný marketplace — před použitím čti README.md a RISK.md nástroje.",
+  "version": "0.1.0",
+  "plugins": [
+    {
+      "name": "medplum-mcp",
+      "description": "MCP přístup k Medplum FHIR API v prostředí dev-pre-production přes osobní OAuth přihlášení. Čtení i zápis; každý zápis vyžaduje potvrzení.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Doktůrek.ai"
+      },
+      "source": "./tools/medplum-mcp",
+      "category": "developer-tools",
+      "tags": ["medplum", "fhir", "mcp", "oauth", "high-risk"],
+      "keywords": ["medplum", "fhir", "mcp", "ehr", "oauth", "pkce"]
+    }
+  ]
+}
