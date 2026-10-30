@@ -26,7 +26,7 @@ Riziko: **vysoké**. Skript sice jen čte metadata, ale používá osobní OAuth
 | OAuth Authorization Code + PKCE S256, ověření `state` a případného `iss`, loopback callback | přihlášení skriptu k Medplumu |
 | Systémové úložiště refresh tokenů, token není předán přes argv ani záměrně vypsán | skript |
 | Kontrola znaků tokenu před vstupem do `security -i` | macOS úložiště skriptu |
-| Allowlist hostitelů a kontrola secrets; Coolify vyžaduje samostatné rozšíření allowlistu | `scripts/check_repo.py` |
+| Allowlist povoluje schváleného hostitele Coolify; ostatní hostitelé zůstávají omezení | `scripts/check_repo.py` |
 
 ## Co ochrany nepokrývají
 
@@ -42,5 +42,5 @@ Skript ukonči přes Ctrl+C. Pro další běhy použij `--no-store`; to již ulo
 ## Vlastník a revize
 
 - Vlastník: Petr Sovadina (@petrsovadina).
-- Poslední revize: 2026-10-30 — přesun z produktových podkladů. Rozšíření allowlistu pro Coolify následuje v samostatném bezpečnostním commitu. Přesun nemění prostředí ani oprávnění serveru.
+- Poslední revize: 2026-10-30 — Petr výslovně schválil přidání `coolify.infra.dokturek.ai` do allowlistu pro stávající MCP diagnostiku. Samostatný bezpečnostní commit mění pouze allowlist a tento popis rizik; nemění prostředí ani oprávnění serveru.
 - Revize nejpozději při opravě známých omezení, změně hostitele, OAuth klientů, Medplumu nebo dostupných nástrojů Coolify.
