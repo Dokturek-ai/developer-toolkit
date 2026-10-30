@@ -15,8 +15,7 @@ Riziko: **vysoké**. Skript sice jen čte metadata, ale používá osobní OAuth
 
 - Únik infrastrukturního tokenu umožní operace podle jeho oprávnění; skript ho na čtecí oprávnění neomezuje.
 - Agent s přímým připojením může provádět i zápisy. User-scope konfigurace v návodu sama neinstaluje hook pro potvrzování zápisů z pluginu `medplum-mcp`.
-- Výsledky diagnostiky mohou působit úspěšně i při neplatné odpovědi povinného FHIR testu.
-- Opakované použití starého refresh tokenu může zneplatnit přihlášení, pokud server tokeny rotuje.
+- Pokud selže uložení rotovaného refresh tokenu, další běh může použít starý token a přihlášení selže nebo ho server zneplatní. Sleduj varování úložiště; v takovém případě použij `--no-store` a nové přihlášení.
 
 ## Ochrany
 
@@ -26,13 +25,15 @@ Riziko: **vysoké**. Skript sice jen čte metadata, ale používá osobní OAuth
 | OAuth Authorization Code + PKCE S256, ověření `state` a případného `iss`, loopback callback | přihlášení skriptu k Medplumu |
 | Systémové úložiště refresh tokenů, token není předán přes argv ani záměrně vypsán | skript |
 | Kontrola znaků tokenu před vstupem do `security -i` | macOS úložiště skriptu |
+| Povinné FHIR metadata musí být JSON objekt typu `CapabilityStatement`, jinak návratový kód 5; diagnostická absolutní cesta pouze varuje | skript, regresní testy |
+| Při obnově z uloženého tokenu se náhradní refresh token uloží před návratem; `--no-store` úložiště obchází | skript, regresní testy |
 | Allowlist povoluje schváleného hostitele Coolify; ostatní hostitelé zůstávají omezení | `scripts/check_repo.py` |
 
 ## Co ochrany nepokrývají
 
 - Živé volání s reálnými tokeny nebylo při přesunu ověřeno. Původní ověřovací záznamy v README jsou datované k 29. 10. 2026.
-- Skript byl přesunut beze změny: neplatný JSON povinného FHIR testu pouze varuje a očekávaný `CapabilityStatement` neověřuje. Úspěšný návratový kód proto není důkaz funkční integrace.
-- Větev obnovy z uloženého refresh tokenu neukládá náhradní refresh token. Před opakovaným použitím oprav rotaci nebo použij `--no-store` a nové přihlášení.
+- Kontrola `CapabilityStatement` nevaliduje celý FHIR zdroj ani funkčnost klinických operací. Úspěch diagnostiky není přejímka integrace.
+- Regresní testy používají syntetické tokeny a simulované úložiště; funkčnost macOS Keychainu a libsecret na tvém stroji neověřují.
 - Allowlist je statická kontrola repozitáře, ne síťová izolace. Neomezuje oprávnění tokenu, discovery endpointy ani chování vzdáleného serveru.
 
 ## Vypnutí a odvolání přístupu
@@ -43,4 +44,5 @@ Skript ukonči přes Ctrl+C. Pro další běhy použij `--no-store`; to již ulo
 
 - Vlastník: Petr Sovadina (@petrsovadina).
 - Poslední revize: 2026-10-30 — Petr výslovně schválil přidání `coolify.infra.dokturek.ai` do allowlistu pro stávající MCP diagnostiku. Samostatný bezpečnostní commit mění pouze allowlist a tento popis rizik; nemění prostředí ani oprávnění serveru.
+- Opravy skriptu: 2026-10-30 — povinná kontrola FHIR metadat a ukládání rotovaného refresh tokenu, včetně regresních testů bez živých přístupů.
 - Revize nejpozději při opravě známých omezení, změně hostitele, OAuth klientů, Medplumu nebo dostupných nástrojů Coolify.

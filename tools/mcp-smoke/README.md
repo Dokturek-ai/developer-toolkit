@@ -1,6 +1,6 @@
 # Připojení agentů k MCP serverům Coolify a Medplum dev
 
-> Interní vývojářský nástroj přesunutý z `dokturek-docs` PR #21 (revize `3154d8025710e60b526ebc62de0e4149ea751d57`) dne 30. 10. 2026. Před použitím si přečti [RISK.md](RISK.md); skript má známá omezení a živé ověření zůstává otevřené. Příkazy níže spouštěj z kořene `developer-toolkit`.
+> Interní vývojářský nástroj přesunutý z `dokturek-docs` PR #21 (revize `3154d8025710e60b526ebc62de0e4149ea751d57`) dne 30. 10. 2026. Před použitím si přečti [RISK.md](RISK.md); živé ověření zůstává otevřené. Příkazy níže spouštěj z kořene `developer-toolkit`.
 
 > **Datum:** 2026-10-29. **Stav:** konfigurace a ověřovací skript jsou hotové. Ověření end-to-end s reálnými tokeny čeká na běh na Petrově Macu (§6).
 > **Značky:** [Z] zjištěno (kód, odpověď serveru, test), [N] neověřeno, [P] návrh.
@@ -104,9 +104,15 @@ Rozlišení chyb (návratový kód):
 | `AUTH` | 2 | HTTP 401/403 (s `WWW-Authenticate`), chyba token endpointu, nesoulad `state` nebo `iss`, chybějící token |
 | `TRANSPORT` | 3 | DNS, TLS, spojení, timeout; HTTP mimo 200/202 (404, 406, 5xx); tělo, které není JSON-RPC; chybějící odpověď v SSE |
 | `PROTOCOL` | 4 | JSON-RPC objekt `error` (například `-32603`, `-32602`) |
-| `TOOL` | 5 | `result.isError: true` nebo nástroj chybí v `tools/list` |
+| `TOOL` | 5 | `result.isError: true`, nástroj chybí v `tools/list` nebo povinné FHIR metadata nejsou JSON objekt typu `CapabilityStatement` |
 
 Skript je ověřený proti lokální replice Medplum MCP (SDK 1.30.1) a Coolify [Z]. Rozlišil platný token, `401` jako `AUTH`, odmítnuté spojení jako `TRANSPORT` a výjimku i neznámý nástroj jako `TOOL`.
+
+Opravy z 30. 10. 2026 ověřují regresní testy bez sítě a systémového úložiště: povinný `GET metadata` při neplatném JSON nebo jiném typu zdroje skončí `FAIL TOOL` a kódem 5. Stejná chyba u diagnostické absolutní cesty zůstává pouze varováním. Po obnově z uloženého refresh tokenu se náhradní token uloží před návratem; pokud ho server nevydá, původní zůstává zachovaný. Neúspěšné uložení vypíše varování. `--no-store` úložiště nečte ani do něj nezapisuje.
+
+```bash
+python3 -m unittest discover -s tools/mcp-smoke/tests -p 'test_*.py' -v
+```
 
 ## 6. Co zbývá ověřit (Petrův Mac)
 

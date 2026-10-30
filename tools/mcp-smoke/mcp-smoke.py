@@ -382,6 +382,9 @@ def medplum_token(args):
             tokens = token_request(meta["token_endpoint"], {
                 "grant_type": "refresh_token", "refresh_token": stored, "client_id": MEDPLUM_CLIENT_ID})
             log("OK", "refresh_token grant", "stored refresh token accepted")
+            if tokens.get("refresh_token"):
+                where = secret_store_put(tokens["refresh_token"])
+                log("OK" if where else "WARN", "refresh token storage", where or "no secure store available, not saved")
             return tokens, meta, None
         except SmokeError as e:
             # Medplum 5.2.1-5.2.8 rejects refresh for defaultOAuthClients with "Invalid client".
@@ -424,15 +427,18 @@ def run_medplum(args):
         step = "tools/call fhir-request GET %s" % path
         try:
             _, texts = client.call_tool("fhir-request", {"method": "GET", "path": path})
-            data = json.loads(" ".join(texts))
+            try:
+                data = json.loads(" ".join(texts))
+            except ValueError:
+                raise SmokeError("TOOL", "tool returned non-JSON text")
+            if not isinstance(data, dict) or data.get("resourceType") != "CapabilityStatement":
+                raise SmokeError("TOOL", "tool did not return a CapabilityStatement")
             log("OK", step, "%s fhirVersion=%s software=%s" % (
                 data.get("resourceType"), data.get("fhirVersion"), (data.get("software") or {}).get("version")))
         except SmokeError as e:
             if required:
                 failures.append(e)
             log("FAIL" if required else "WARN", step, "%s: %s" % (e.kind, e))
-        except ValueError:
-            log("WARN", step, "tool returned non-JSON text")
     return failures
 
 
