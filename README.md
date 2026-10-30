@@ -12,6 +12,7 @@ Obecné pluginy a skilly bez přístupu k datům patří do [plugin-marketplace-
 | Nástroj | Co dělá | Prostředí | Zápis do dat | Klienti |
 |---|---|---|---|---|
 | [`medplum-mcp`](tools/medplum-mcp/) | MCP přístup k Medplum FHIR API | dev-pre-production | ano, v Claude Code s potvrzením | Claude Code, Claude Desktop, Codex |
+| [`mcp-smoke`](tools/mcp-smoke/) | Nastavení agentů a samostatná MCP diagnostika; živé ověření zbývá | Medplum dev, Coolify infra | skript jen čte; připojení agentů podle oprávnění účtu | Python 3.9+, návody pro osobní agenty |
 
 Každý nástroj má `README.md` (nastavení, ověření, odhlášení) a `RISK.md` (k čemu má přístup, co může pokazit, jak ho vypnout).
 
