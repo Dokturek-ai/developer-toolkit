@@ -95,7 +95,8 @@ def read_sse_until(resp, msg_id):
             except ValueError:
                 event = None
             data = []
-            if isinstance(event, dict) and event.get("id") == msg_id:
+            if (isinstance(event, dict) and not isinstance(event.get("id"), bool)
+                    and event.get("id") == msg_id):
                 break
     return b"".join(lines)
 
@@ -156,13 +157,15 @@ class McpClient:
         try:
             if "text/event-stream" in ctype:
                 for event in parse_sse(text):
-                    if isinstance(event, dict) and event.get("id") == msg_id:
+                    if (isinstance(event, dict) and not isinstance(event.get("id"), bool)
+                            and event.get("id") == msg_id):
                         response = event
             else:
                 response = json.loads(text)
         except ValueError:
             raise SmokeError("TRANSPORT", "%s: body is not JSON-RPC (%s): %s" % (method, ctype, text[:200]))
-        if not isinstance(response, dict) or response.get("jsonrpc") != "2.0":
+        if (not isinstance(response, dict) or response.get("jsonrpc") != "2.0"
+                or isinstance(response.get("id"), bool) or response.get("id") != msg_id):
             raise SmokeError("TRANSPORT", "%s: no JSON-RPC response for id %d (%s)" % (method, msg_id, ctype))
         if "error" in response:
             err = response["error"]
@@ -222,9 +225,9 @@ def coolify_token(codex_config):
                     section = m.group(1).strip()
                     continue
                 if section == "mcp_servers.coolify-selfhosted.http_headers":
-                    m = re.match(r'^"?Authorization"?\s*=\s*"Bearer\s+([^"]+)"', line)
+                    m = re.match(r'''^"?Authorization"?\s*=\s*(["'])Bearer\s+([^"']+)\1''', line)
                     if m:
-                        return m.group(1), codex_config
+                        return m.group(2), codex_config
     raise SmokeError("AUTH", "no Coolify token: set COOLIFY_API_TOKEN or provide %s" % codex_config)
 
 
@@ -371,8 +374,18 @@ def medplum_token(args):
     status, _, body = http_request(MEDPLUM_DISCOVERY)
     if status != 200:
         raise SmokeError("TRANSPORT", "OAuth discovery HTTP %d" % status)
-    meta = json.loads(body)
-    if "S256" not in meta.get("code_challenge_methods_supported", []):
+    try:
+        meta = json.loads(body)
+    except ValueError:
+        raise SmokeError("TRANSPORT", "OAuth discovery body is not JSON")
+    if not isinstance(meta, dict) or any(
+            not isinstance(meta.get(field), str) or not meta[field].strip()
+            for field in ("issuer", "token_endpoint", "authorization_endpoint")):
+        raise SmokeError("TRANSPORT", "OAuth discovery requires issuer, token_endpoint and authorization_endpoint strings")
+    methods = meta.get("code_challenge_methods_supported", [])
+    if not isinstance(methods, list) or any(not isinstance(method, str) for method in methods):
+        raise SmokeError("TRANSPORT", "OAuth discovery code_challenge_methods_supported must be a list of strings")
+    if "S256" not in methods:
         raise SmokeError("AUTH", "authorization server does not advertise PKCE S256")
     log("OK", "OAuth discovery", meta["issuer"])
 
@@ -406,7 +419,8 @@ def medplum_token(args):
                 "client_id": MEDPLUM_CLIENT_ID})
             log("OK", "refresh_token grant", "works")
             if refreshed.get("refresh_token") and not args.no_store:
-                secret_store_put(refreshed["refresh_token"])
+                where = secret_store_put(refreshed["refresh_token"])
+                log("OK" if where else "WARN", "refresh token storage", where or "no secure store available, not saved")
             tokens = refreshed
         except SmokeError as e:
             refresh_error = e

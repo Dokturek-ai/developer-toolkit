@@ -28,6 +28,7 @@ Riziko: **vysoké**. Agent čte i zapisuje do Medplumu v rozsahu tvého účtu, 
 | Medplum odmítne `path`, která míří mimo vlastní origin — ochrana proti SSRF a úniku tokenu (Medplum ≥ 5.2.0) | server |
 | `mcp-remote` připnutý na 0.14.3 | most pro Claude Desktop |
 | Allowlist hostitelů, kontrola připnutých verzí a vzorů secrets v CI (`scripts/check_repo.py`, gitleaks) | repo |
+| Instalátor při konfliktu nevypisuje existující konfiguraci se secrets a náhradu vyžaduje povolit přes `--force` | instalátor Claude Desktopu, regresní test |
 
 ## Co ochrany nepokrývají
 
@@ -51,4 +52,5 @@ Na serveru — správce Medplumu v Coolify, resource `medplum` (projekt `dokture
 
 - Vlastník: Petr Sovadina (@petrsovadina)
 - Poslední revize: 2026-10-24 — Medplum 5.2.1, mcp-remote 0.14.3, Claude Code 2.1.310, Codex CLI 0.163.0. Scope bez `offline_access` kvůli chybě refresh flow v Medplumu.
+- Revize instalátoru: 2026-11-01 — verze 0.1.1 odstraňuje výpis existující konfigurace při konfliktu; testy používají pouze syntetická data a dočasný soubor.
 - Revize nejpozději při upgradu Medplumu, změně OAuth klientů, novém klientovi nebo změně verze `mcp-remote`.

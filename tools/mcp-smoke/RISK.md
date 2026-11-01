@@ -26,7 +26,8 @@ Riziko: **vysoké**. Skript sice jen čte metadata, ale používá osobní OAuth
 | Systémové úložiště refresh tokenů, token není předán přes argv ani záměrně vypsán | skript |
 | Kontrola znaků tokenu před vstupem do `security -i` | macOS úložiště skriptu |
 | Povinné FHIR metadata musí být JSON objekt typu `CapabilityStatement`, jinak návratový kód 5; diagnostická absolutní cesta pouze varuje | skript, regresní testy |
-| Při obnově z uloženého tokenu se náhradní refresh token uloží před návratem; `--no-store` úložiště obchází | skript, regresní testy |
+| Při obnově z uloženého tokenu i při `--check-refresh` se náhradní token uloží a neúspěšný zápis vypíše varování; `--no-store` úložiště obchází | skript, regresní testy |
+| OAuth discovery musí být JSON objekt s povinnými textovými poli; JSON i SSE odpovědi se párují podle ID a odmítají boolean ID | skript, regresní testy |
 | Allowlist povoluje schváleného hostitele Coolify; ostatní hostitelé zůstávají omezení | `scripts/check_repo.py` |
 
 ## Co ochrany nepokrývají
@@ -45,4 +46,5 @@ Skript ukonči přes Ctrl+C. Pro další běhy použij `--no-store`; to již ulo
 - Vlastník: Petr Sovadina (@petrsovadina).
 - Poslední revize: 2026-10-30 — Petr výslovně schválil přidání `coolify.infra.dokturek.ai` do allowlistu pro stávající MCP diagnostiku. Samostatný bezpečnostní commit mění pouze allowlist a tento popis rizik; nemění prostředí ani oprávnění serveru.
 - Opravy skriptu: 2026-10-30 — povinná kontrola FHIR metadat a ukládání rotovaného refresh tokenu, včetně regresních testů bez živých přístupů.
+- Revize oprav: 2026-11-01 — varování při druhém uložení tokenu, validace OAuth discovery a ID odpovědí JSON/SSE včetně boolean hodnot; ověřeno syntetickými testy.
 - Revize nejpozději při opravě známých omezení, změně hostitele, OAuth klientů, Medplumu nebo dostupných nástrojů Coolify.

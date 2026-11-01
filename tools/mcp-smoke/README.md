@@ -110,6 +110,8 @@ Skript je ověřený proti lokální replice Medplum MCP (SDK 1.30.1) a Coolify 
 
 Opravy z 30. 10. 2026 ověřují regresní testy bez sítě a systémového úložiště: povinný `GET metadata` při neplatném JSON nebo jiném typu zdroje skončí `FAIL TOOL` a kódem 5. Stejná chyba u diagnostické absolutní cesty zůstává pouze varováním. Po obnově z uloženého refresh tokenu se náhradní token uloží před návratem; pokud ho server nevydá, původní zůstává zachovaný. Neúspěšné uložení vypíše varování. `--no-store` úložiště nečte ani do něj nezapisuje.
 
+Opravy z 1. 11. 2026 přidávají stejné varování i pro druhé uložení tokenu při `--check-refresh`. Neplatný JSON nebo chybějící či chybně typovaná povinná pole OAuth discovery skončí `TRANSPORT` a kódem 3; chybějící podpora S256 dál končí `AUTH`. JSON i SSE odpověď musí mít ID odeslaného požadavku; boolean `true` není číselné ID `1`. Při čtení tokenu z podporované TOML sekce může být hodnota v dvojitých uvozovkách i apostrofech.
+
 ```bash
 python3 -m unittest discover -s tools/mcp-smoke/tests -p 'test_*.py' -v
 ```

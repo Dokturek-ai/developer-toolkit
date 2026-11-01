@@ -6,7 +6,7 @@ import json
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import call, mock_open, patch
 
 
 SPEC = importlib.util.spec_from_file_location(
@@ -15,6 +15,113 @@ smoke = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(smoke)
 
 CAPABILITY = json.dumps({"resourceType": "CapabilityStatement", "fhirVersion": "4.0.1"})
+DISCOVERY = {"issuer": "synthetic-issuer", "token_endpoint": "synthetic-token-endpoint",
+             "authorization_endpoint": "synthetic-authorization-endpoint",
+             "code_challenge_methods_supported": ["S256"]}
+
+
+class DiscoveryTest(unittest.TestCase):
+    def check_failure(self, body, code):
+        output = io.StringIO()
+        with patch.object(smoke, "http_request", return_value=(200, {}, body)), \
+                patch.object(smoke, "secret_store_get", return_value=None) as get, \
+                patch.object(smoke, "authorize_interactive", return_value={"access_token": "synthetic-access"}) as authorize, \
+                patch.object(smoke.sys, "argv", ["mcp-smoke.py", "medplum"]), \
+                contextlib.redirect_stdout(output):
+            self.assertEqual(smoke.main(), code)
+        get.assert_not_called()
+        authorize.assert_not_called()
+        self.assertIn("[FAIL] " + ("TRANSPORT" if code == 3 else "AUTH"), output.getvalue())
+        self.assertNotIn("all checks passed", output.getvalue())
+
+    def test_non_json_discovery_is_transport_failure(self):
+        self.check_failure(b"<html>login page</html>", 3)
+
+    def test_invalid_discovery_shape_is_transport_failure(self):
+        for value in ([], None, {}, "text"):
+            with self.subTest(value=value):
+                self.check_failure(json.dumps(value).encode(), 3)
+        for field in ("issuer", "token_endpoint", "authorization_endpoint"):
+            for value in (None, "", " ", 1, []):
+                with self.subTest(field=field, value=value):
+                    self.check_failure(json.dumps(dict(DISCOVERY, **{field: value})).encode(), 3)
+        for value in (None, "S256", {"S256": True}, [1]):
+            with self.subTest(methods=value):
+                self.check_failure(json.dumps(dict(
+                    DISCOVERY, code_challenge_methods_supported=value)).encode(), 3)
+
+    def test_missing_s256_remains_auth_failure(self):
+        meta = dict(DISCOVERY, code_challenge_methods_supported=["plain"])
+        self.check_failure(json.dumps(meta).encode(), 2)
+
+
+class McpResponseTest(unittest.TestCase):
+    def test_wrong_or_missing_id_cannot_pass_cli_checks(self):
+        for response_id in (999, "1", None, True):
+            for payload in ({"result": {}}, {"error": {"code": -32603, "message": "synthetic"}}):
+                with self.subTest(response_id=response_id, payload=payload):
+                    response = dict(payload, jsonrpc="2.0")
+                    if response_id is not None:
+                        response["id"] = response_id
+                    output = io.StringIO()
+                    with patch.object(smoke, "coolify_token", return_value=("synthetic-token", "test")), \
+                            patch.object(smoke, "http_request", return_value=(
+                                200, {"Content-Type": "application/json"}, json.dumps(response).encode())), \
+                            patch.object(smoke.sys, "argv", ["mcp-smoke.py", "coolify"]), \
+                            contextlib.redirect_stdout(output):
+                        self.assertEqual(smoke.main(), 3)
+                    self.assertIn("[FAIL] TRANSPORT", output.getvalue())
+                    self.assertNotIn("all checks passed", output.getvalue())
+
+    def test_matching_id_is_accepted_for_json_and_sse(self):
+        result = {"tools": []}
+        response = json.dumps({"jsonrpc": "2.0", "id": 1, "result": result})
+        for content_type, text in (("application/json", response),
+                                   ("text/event-stream", "data: " + response + "\n\n")):
+            with self.subTest(content_type=content_type), patch.object(
+                    smoke, "http_request", return_value=(200, {"Content-Type": content_type}, text.encode())):
+                client = smoke.McpClient("synthetic-url", "synthetic-token")
+                self.assertEqual(client.request("tools/list"), result)
+
+    def test_boolean_id_is_rejected_in_sse(self):
+        response = json.dumps({"jsonrpc": "2.0", "id": True, "result": {"tools": []}})
+        with patch.object(smoke, "http_request", return_value=(
+                200, {"Content-Type": "text/event-stream"}, ("data: " + response + "\n\n").encode())):
+            client = smoke.McpClient("synthetic-url", "synthetic-token")
+            with self.assertRaises(smoke.SmokeError) as error:
+                client.request("tools/list")
+        self.assertEqual(error.exception.kind, "TRANSPORT")
+
+    def test_sse_boolean_id_does_not_replace_matching_response(self):
+        result = {"tools": []}
+        valid = 'data: ' + json.dumps({"jsonrpc": "2.0", "id": 1, "result": result}) + "\n\n"
+        invalid = 'data: ' + json.dumps({"jsonrpc": "2.0", "id": True, "result": "wrong"}) + "\n\n"
+        for text in (invalid + valid, valid + invalid):
+            with self.subTest(text=text), patch.object(smoke, "http_request", return_value=(
+                    200, {"Content-Type": "text/event-stream"}, text.encode())):
+                client = smoke.McpClient("synthetic-url", "synthetic-token")
+                self.assertEqual(client.request("tools/list"), result)
+
+    def test_sse_reader_waits_past_boolean_id_and_stops_at_matching_id(self):
+        invalid = b'data: {"jsonrpc":"2.0","id":true,"result":"wrong"}\n\n'
+        valid = b'data: {"jsonrpc":"2.0","id":1,"result":{}}\n\n'
+        trailing = b'data: {"jsonrpc":"2.0","id":2,"result":{}}\n\n'
+        stream = io.BytesIO(invalid + valid + trailing)
+        self.assertEqual(smoke.read_sse_until(stream, 1), invalid + valid)
+        self.assertEqual(stream.read(), trailing)
+
+
+class CoolifyTokenTest(unittest.TestCase):
+    def test_both_toml_string_quotes_load_token(self):
+        for quote in ('"', "'"):
+            with self.subTest(quote=quote):
+                config = ('[mcp_servers.coolify-selfhosted.http_headers]\n'
+                          'Authorization = {0}Bearer synthetic-coolify{0}\n').format(quote)
+                with patch.dict(smoke.os.environ, {}, clear=True), \
+                        patch.object(smoke.os.path, "exists", return_value=True), \
+                        patch("builtins.open", mock_open(read_data=config)):
+                    self.assertEqual(smoke.coolify_token("synthetic-config.toml"),
+                                     ("synthetic-coolify", "synthetic-config.toml"))
 
 
 class MetadataTest(unittest.TestCase):
@@ -65,10 +172,8 @@ class RefreshTokenTest(unittest.TestCase):
         self.addCleanup(stack.close)
         self.output = io.StringIO()
         stack.enter_context(contextlib.redirect_stdout(self.output))
-        meta = {"issuer": "synthetic-issuer", "token_endpoint": "synthetic-token-endpoint",
-                "code_challenge_methods_supported": ["S256"]}
         stack.enter_context(patch.object(smoke, "http_request", return_value=(
-            200, {}, json.dumps(meta).encode())))
+            200, {}, json.dumps(DISCOVERY).encode())))
         self.get = stack.enter_context(patch.object(
             smoke, "secret_store_get", return_value="synthetic-refresh-old"))
         self.put = stack.enter_context(patch.object(
@@ -111,6 +216,21 @@ class RefreshTokenTest(unittest.TestCase):
         self.assertIsNone(error)
         self.assertIn("[WARN] refresh token storage", self.output.getvalue())
         self.authorize.assert_not_called()
+
+    def test_check_refresh_warns_when_second_token_save_fails(self):
+        self.get.return_value = None
+        self.args.check_refresh = True
+        self.put.side_effect = ["test secure store", None]
+        tokens, _, error = smoke.medplum_token(self.args)
+        self.assertIsNone(error)
+        self.assertEqual(tokens["refresh_token"], "synthetic-refresh-new")
+        self.assertEqual(self.put.call_args_list, [
+            call("synthetic-browser-refresh"), call("synthetic-refresh-new")])
+        self.authorize.assert_called_once()
+        self.assertIn("[OK] refresh token storage", self.output.getvalue())
+        self.assertIn("[WARN] refresh token storage", self.output.getvalue())
+        self.assertNotIn("synthetic-browser-refresh", self.output.getvalue())
+        self.assertNotIn("synthetic-refresh-new", self.output.getvalue())
 
     def test_no_store_uses_browser_and_never_reads_or_saves_tokens(self):
         self.args.no_store = True
