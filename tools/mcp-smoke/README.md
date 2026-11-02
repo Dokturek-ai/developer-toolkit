@@ -114,6 +114,8 @@ Opravy z 1. 11. 2026 přidávají stejné varování i pro druhé uložení toke
 
 Oprava z 2. 11. 2026 vyžaduje právě jedno z polí `result` a `error`: výsledek musí být objekt, chyba musí mít celočíselný `code` a textový `message`. Handshake kontroluje typy povinných polí a seznam nástrojů. `tools/call` vyžaduje pole `content`, objekty s textovým `type`, textový `text` u textových bloků a případné boolean `isError`. Vadné tvary skončí `TRANSPORT` / 3 místo pádu nebo falešného `OK`. Platné prázdné `content: []` zůstává povolené; platné chyby serveru a nástroje zachovávají kódy 4 a 5. Syntetické regresní testy pokrývají JSON i SSE. Jde o kontrolu polí používaných diagnostikou, nikoli úplnou validaci všech vnořených MCP schémat.
 
+Token endpoint musí vrátit JSON objekt a při HTTP 200 neprázdný textový `access_token`. Vadný tvar skončí `TRANSPORT` / 3; při obnově uloženého tokenu se místo pádu spustí přihlášení v prohlížeči. Chybová OAuth odpověď v objektu při HTTP mimo 200 dál končí `AUTH` / 2. Syntetické regresní testy ověřují i tento fallback.
+
 ```bash
 python3 -m unittest discover -s tools/mcp-smoke/tests -p 'test_*.py' -v
 ```

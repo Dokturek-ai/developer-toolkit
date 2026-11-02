@@ -327,9 +327,13 @@ def token_request(token_endpoint, form):
         data = json.loads(body)
     except ValueError:
         raise SmokeError("TRANSPORT", "token endpoint HTTP %d, non-JSON body" % status)
-    if status != 200 or "access_token" not in data:
+    if not isinstance(data, dict):
+        raise SmokeError("TRANSPORT", "token endpoint HTTP %d, response must be a JSON object" % status)
+    if status != 200:
         raise SmokeError("AUTH", "token endpoint HTTP %d: %s %s" % (
             status, data.get("error"), data.get("error_description")))
+    if not isinstance(data.get("access_token"), str) or not data["access_token"].strip():
+        raise SmokeError("TRANSPORT", "token endpoint HTTP %d, access_token must be a nonempty string" % status)
     return data
 
 
