@@ -334,6 +334,9 @@ def token_request(token_endpoint, form):
             status, data.get("error"), data.get("error_description")))
     if not isinstance(data.get("access_token"), str) or not data["access_token"].strip():
         raise SmokeError("TRANSPORT", "token endpoint HTTP %d, access_token must be a nonempty string" % status)
+    if "refresh_token" in data and (
+            not isinstance(data["refresh_token"], str) or not data["refresh_token"].strip()):
+        raise SmokeError("TRANSPORT", "token endpoint HTTP %d, refresh_token must be a nonempty string" % status)
     return data
 
 
@@ -473,8 +476,7 @@ def run_medplum(args):
                 raise SmokeError("TOOL", "tool returned non-JSON text")
             if not isinstance(data, dict) or data.get("resourceType") != "CapabilityStatement":
                 raise SmokeError("TOOL", "tool did not return a CapabilityStatement")
-            log("OK", step, "%s fhirVersion=%s software=%s" % (
-                data.get("resourceType"), data.get("fhirVersion"), (data.get("software") or {}).get("version")))
+            log("OK", step, "%s fhirVersion=%s" % (data.get("resourceType"), data.get("fhirVersion")))
         except SmokeError as e:
             if required:
                 failures.append(e)

@@ -28,7 +28,7 @@ Riziko: **vysoké**. Skript sice jen čte metadata, ale používá osobní OAuth
 | Povinné FHIR metadata musí být JSON objekt typu `CapabilityStatement`, jinak návratový kód 5; diagnostická absolutní cesta pouze varuje | skript, regresní testy |
 | Při obnově z uloženého tokenu i při `--check-refresh` se náhradní token uloží a neúspěšný zápis vypíše varování; `--no-store` úložiště obchází | skript, regresní testy |
 | OAuth discovery musí být JSON objekt s povinnými textovými poli; JSON i SSE odpovědi se párují podle ID a odmítají boolean ID | skript, regresní testy |
-| Token endpoint musí vrátit JSON objekt a při HTTP 200 neprázdný textový `access_token`; vadný tvar je `TRANSPORT`, při obnově uloženého tokenu následuje přihlášení v prohlížeči | skript, syntetické regresní testy |
+| Token endpoint musí vrátit JSON objekt a při HTTP 200 neprázdný textový `access_token` i případný `refresh_token`; vadný tvar je `TRANSPORT`, při obnově uloženého tokenu následuje přihlášení v prohlížeči | skript, syntetické regresní testy |
 | JSON-RPC obálka a používaná pole handshake, seznamu nástrojů a výsledku volání musí mít očekávaný tvar; vadná odpověď končí `TRANSPORT` / 3 | skript, syntetické regresní testy JSON/SSE |
 | Allowlist povoluje schváleného hostitele Coolify; ostatní hostitelé zůstávají omezení | `scripts/check_repo.py` |
 
@@ -51,5 +51,5 @@ Skript ukonči přes Ctrl+C. Pro další běhy použij `--no-store`; to již ulo
 - Opravy skriptu: 2026-10-30 — povinná kontrola FHIR metadat a ukládání rotovaného refresh tokenu, včetně regresních testů bez živých přístupů.
 - Revize oprav: 2026-11-01 — varování při druhém uložení tokenu, validace OAuth discovery a ID odpovědí JSON/SSE včetně boolean hodnot; ověřeno syntetickými testy.
 - Revize oprav: 2026-11-02 — validace JSON-RPC `result`/`error` a používaných polí MCP výsledků; regresní testy pro neplatné odpovědi i zachování návratových kódů platných odpovědí.
-- Revize oprav: 2026-11-02 — validace objektu tokenové odpovědi a neprázdného textového `access_token`; syntetické testy klasifikace `TRANSPORT` a fallbacku při obnově uloženého tokenu.
+- Revize oprav: 2026-11-02 — validace objektu tokenové odpovědi, neprázdného textového `access_token` i případného `refresh_token`; testy klasifikace `TRANSPORT`, fallbacku a zachování tokenu při vadném `--check-refresh`. Výpis metadat nepoužívá volitelné pole `software`, jeho nečekaný tvar proto nezpůsobí pád.
 - Revize nejpozději při opravě známých omezení, změně hostitele, OAuth klientů, Medplumu nebo dostupných nástrojů Coolify.

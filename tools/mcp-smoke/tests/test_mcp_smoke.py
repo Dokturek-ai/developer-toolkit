@@ -56,15 +56,16 @@ class DiscoveryTest(unittest.TestCase):
 
 
 class TokenResponseTest(unittest.TestCase):
-    def check_transport_failure(self, status, body):
+    def check_transport_failure(self, status, body, no_store=True):
         output = io.StringIO()
         with patch.object(smoke, "http_request", side_effect=[
                 (200, {}, json.dumps(DISCOVERY).encode()), (status, {}, body)]), \
                 patch.object(smoke, "authorize_interactive", side_effect=lambda meta: smoke.token_request(
                     meta["token_endpoint"], {"grant_type": "authorization_code"})), \
+                patch.object(smoke, "secret_store_get", return_value=None), \
                 patch.object(smoke, "secret_store_put") as put, \
                 patch.object(smoke, "McpClient") as client, \
-                patch.object(smoke.sys, "argv", ["mcp-smoke.py", "medplum", "--no-store"]), \
+                patch.object(smoke.sys, "argv", ["mcp-smoke.py", "medplum"] + (["--no-store"] if no_store else [])), \
                 contextlib.redirect_stdout(output):
             self.assertEqual(smoke.main(), 3)
         self.assertIn("[FAIL] TRANSPORT", output.getvalue())
@@ -88,10 +89,19 @@ class TokenResponseTest(unittest.TestCase):
     def test_non_json_token_response_fails_as_transport(self):
         self.check_transport_failure(200, b"<html>synthetic error</html>")
 
+    def test_refresh_token_must_be_nonempty_string_when_present(self):
+        for value in (None, "", " \t", 123, True, False, [], ["synthetic"], {}, {"token": "synthetic"}):
+            for no_store in (False, True):
+                with self.subTest(value=value, no_store=no_store):
+                    body = json.dumps({"access_token": "synthetic-access", "refresh_token": value}).encode()
+                    self.check_transport_failure(200, body, no_store)
+
     def test_valid_tokens_are_preserved(self):
-        tokens = {"access_token": "synthetic-access", "refresh_token": "synthetic-refresh"}
-        with patch.object(smoke, "http_request", return_value=(200, {}, json.dumps(tokens).encode())):
-            self.assertEqual(smoke.token_request("synthetic-token-endpoint", {}), tokens)
+        for tokens in ({"access_token": "synthetic-access"},
+                       {"access_token": "synthetic-access", "refresh_token": "synthetic-refresh"}):
+            with self.subTest(tokens=tokens), patch.object(
+                    smoke, "http_request", return_value=(200, {}, json.dumps(tokens).encode())):
+                self.assertEqual(smoke.token_request("synthetic-token-endpoint", {}), tokens)
 
     def test_oauth_error_remains_auth_failure(self):
         body = json.dumps({"error": "invalid_grant", "error_description": "synthetic failure"}).encode()
@@ -102,7 +112,10 @@ class TokenResponseTest(unittest.TestCase):
         self.assertIn("invalid_grant", str(error.exception))
 
     def test_malformed_stored_refresh_response_falls_back_to_browser(self):
-        for status, value in ((200, None), (400, []), (200, {"access_token": None})):
+        cases = [(200, None), (400, []), (200, {"access_token": None})]
+        cases += [(200, {"access_token": "synthetic-access", "refresh_token": value})
+                  for value in (None, "", " \t", 123, True, [], ["synthetic"], {}, {"token": "synthetic"})]
+        for status, value in cases:
             with self.subTest(status=status, value=value):
                 output = io.StringIO()
                 tokens = {"access_token": "synthetic-browser-access"}
@@ -120,6 +133,25 @@ class TokenResponseTest(unittest.TestCase):
                 self.assertIn("TRANSPORT", output.getvalue())
                 self.assertIn("falling back to browser sign-in", output.getvalue())
                 self.assertNotIn("synthetic-refresh", output.getvalue())
+
+    def test_invalid_refresh_check_does_not_overwrite_initial_token(self):
+        initial = {"access_token": "synthetic-browser-access", "refresh_token": "synthetic-browser-refresh"}
+        for value in (123, True, ["synthetic"], {"token": "synthetic"}):
+            with self.subTest(value=value):
+                output = io.StringIO()
+                with patch.object(smoke, "http_request", side_effect=[
+                        (200, {}, json.dumps(DISCOVERY).encode()),
+                        (200, {}, json.dumps({"access_token": "synthetic-access", "refresh_token": value}).encode())]), \
+                        patch.object(smoke, "secret_store_get", return_value=None), \
+                        patch.object(smoke, "authorize_interactive", return_value=initial), \
+                        patch.object(smoke, "secret_store_put", return_value="test secure store") as put, \
+                        contextlib.redirect_stdout(output):
+                    tokens, _, error = smoke.medplum_token(SimpleNamespace(no_store=False, check_refresh=True))
+                self.assertEqual(tokens, initial)
+                self.assertEqual(error.kind, "TRANSPORT")
+                put.assert_called_once_with(initial["refresh_token"])
+                self.assertIn("[FAIL] refresh_token grant", output.getvalue())
+                self.assertNotIn("synthetic-browser-refresh", output.getvalue())
 
 
 class McpResponseTest(unittest.TestCase):
@@ -311,6 +343,16 @@ class MetadataTest(unittest.TestCase):
                 self.assertEqual(code, 0)
                 self.assertIn("[WARN] tools/call fhir-request GET /fhir/R4/metadata", output)
                 self.assertNotIn("[FAIL]", output)
+
+    def test_optional_software_does_not_affect_metadata_checks(self):
+        for software in (["synthetic"], "synthetic", 123, True):
+            text = json.dumps({"resourceType": "CapabilityStatement", "software": software})
+            for optional in (False, True):
+                with self.subTest(software=software, optional=optional):
+                    code, output = self.run_cli(CAPABILITY, text) if optional else self.run_cli(text)
+                    self.assertEqual(code, 0)
+                    self.assertIn("all checks passed", output)
+                    self.assertNotIn("[FAIL]", output)
 
 
 class RefreshTokenTest(unittest.TestCase):
