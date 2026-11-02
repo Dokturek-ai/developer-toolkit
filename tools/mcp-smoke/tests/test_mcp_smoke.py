@@ -56,6 +56,86 @@ class DiscoveryTest(unittest.TestCase):
 
 
 class McpResponseTest(unittest.TestCase):
+    def run_responses(self, payloads, sse=False):
+        responses = []
+        for msg_id, payload in enumerate(payloads, 1):
+            text = json.dumps(dict(payload, jsonrpc="2.0", id=msg_id))
+            content_type = "text/event-stream" if sse else "application/json"
+            if sse:
+                text = "data: " + text + "\n\n"
+            responses.append((200, {"Content-Type": content_type}, text.encode()))
+            if msg_id == 1:
+                responses.append((202, {}, b""))  # notifications/initialized
+        output = io.StringIO()
+        with patch.object(smoke, "coolify_token", return_value=("synthetic-token", "test")), \
+                patch.object(smoke, "http_request", side_effect=responses), \
+                patch.object(smoke.sys, "argv", ["mcp-smoke.py", "coolify"]), \
+                contextlib.redirect_stdout(output):
+            code = smoke.main()
+        return code, output.getvalue()
+
+    def valid_handshake(self):
+        return [{"result": {"protocolVersion": smoke.PROTOCOL_VERSION, "capabilities": {},
+                            "serverInfo": {"name": "synthetic", "version": "1"}}},
+                {"result": {"tools": [{"name": name, "inputSchema": {"type": "object"}}
+                                      for name in ("get_current_team", "get_infrastructure_overview")]}}]
+
+    def test_invalid_rpc_envelopes_fail_cli_as_transport(self):
+        payloads = [{}, {"error": None}, {"error": []}, {"error": {}},
+                    {"error": {"code": True, "message": "synthetic"}},
+                    {"error": {"code": -32603, "message": None}},
+                    {"result": {}, "error": {"code": -32603, "message": "synthetic"}}]
+        payloads += [{"result": value} for value in (None, [], "text", 1, True)]
+        for sse in (False, True):
+            for payload in payloads:
+                with self.subTest(sse=sse, payload=payload):
+                    code, output = self.run_responses([payload], sse)
+                    self.assertEqual(code, 3)
+                    self.assertIn("[FAIL] TRANSPORT", output)
+                    self.assertNotIn("all checks passed", output)
+
+    def test_invalid_handshake_results_fail_as_transport(self):
+        for result in ({}, {"protocolVersion": None},
+                       dict(self.valid_handshake()[0]["result"], serverInfo=None),
+                       dict(self.valid_handshake()[0]["result"], serverInfo={"name": "synthetic"}),
+                       dict(self.valid_handshake()[0]["result"], capabilities=[])):
+            with self.subTest(result=result):
+                self.assertEqual(self.run_responses([{"result": result}])[0], 3)
+        for tools in (None, {}, [None], [{}], [{"name": 1}],
+                      [{"name": "synthetic", "inputSchema": None}]):
+            with self.subTest(tools=tools):
+                self.assertEqual(self.run_responses(
+                    self.valid_handshake()[:1] + [{"result": {"tools": tools}}])[0], 3)
+        self.assertEqual(self.run_responses(self.valid_handshake()[:1] + [{"result": {}}])[0], 3)
+
+    def test_invalid_tool_results_cannot_pass_coolify_checks(self):
+        results = [{}, {"content": None}, {"content": {}}, {"content": [None]},
+                   {"content": [{}]}, {"content": [{"type": "text"}]},
+                   {"content": [{"type": "text", "text": 1}]},
+                   {"content": [], "isError": "false"}]
+        for sse in (False, True):
+            for result in results:
+                with self.subTest(sse=sse, result=result):
+                    code, output = self.run_responses(
+                        self.valid_handshake() + [{"result": result}] * 2, sse)
+                    self.assertEqual(code, 3)
+                    self.assertIn("TRANSPORT", output)
+                    self.assertNotIn("[OK] tools/call", output)
+                    self.assertNotIn("all checks passed", output)
+
+    def test_valid_success_and_errors_keep_exit_codes(self):
+        for sse in (False, True):
+            for content in ([], [{"type": "text", "text": "synthetic"}],
+                            [{"type": "image", "data": "", "mimeType": "image/png"}]):
+                with self.subTest(sse=sse, content=content):
+                    self.assertEqual(self.run_responses(self.valid_handshake() + [
+                        {"result": {"content": content}}] * 2, sse)[0], 0)
+            self.assertEqual(self.run_responses([
+                {"error": {"code": -32603, "message": "synthetic"}}], sse)[0], 4)
+            self.assertEqual(self.run_responses(self.valid_handshake() + [
+                {"result": {"content": [{"type": "text", "text": "synthetic failure"}],
+                            "isError": True}}] * 2, sse)[0], 5)
+
     def test_wrong_or_missing_id_cannot_pass_cli_checks(self):
         for response_id in (999, "1", None, True):
             for payload in ({"result": {}}, {"error": {"code": -32603, "message": "synthetic"}}):

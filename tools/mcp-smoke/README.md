@@ -102,7 +102,7 @@ Rozlišení chyb (návratový kód):
 | Třída | Kód | Kdy |
 |---|---|---|
 | `AUTH` | 2 | HTTP 401/403 (s `WWW-Authenticate`), chyba token endpointu, nesoulad `state` nebo `iss`, chybějící token |
-| `TRANSPORT` | 3 | DNS, TLS, spojení, timeout; HTTP mimo 200/202 (404, 406, 5xx); tělo, které není JSON-RPC; chybějící odpověď v SSE |
+| `TRANSPORT` | 3 | DNS, TLS, spojení, timeout; HTTP mimo 200/202 (404, 406, 5xx); neplatná JSON-RPC obálka nebo struktura používaných polí výsledku; chybějící odpověď v SSE |
 | `PROTOCOL` | 4 | JSON-RPC objekt `error` (například `-32603`, `-32602`) |
 | `TOOL` | 5 | `result.isError: true`, nástroj chybí v `tools/list` nebo povinné FHIR metadata nejsou JSON objekt typu `CapabilityStatement` |
 
@@ -111,6 +111,8 @@ Skript je ověřený proti lokální replice Medplum MCP (SDK 1.30.1) a Coolify 
 Opravy z 30. 10. 2026 ověřují regresní testy bez sítě a systémového úložiště: povinný `GET metadata` při neplatném JSON nebo jiném typu zdroje skončí `FAIL TOOL` a kódem 5. Stejná chyba u diagnostické absolutní cesty zůstává pouze varováním. Po obnově z uloženého refresh tokenu se náhradní token uloží před návratem; pokud ho server nevydá, původní zůstává zachovaný. Neúspěšné uložení vypíše varování. `--no-store` úložiště nečte ani do něj nezapisuje.
 
 Opravy z 1. 11. 2026 přidávají stejné varování i pro druhé uložení tokenu při `--check-refresh`. Neplatný JSON nebo chybějící či chybně typovaná povinná pole OAuth discovery skončí `TRANSPORT` a kódem 3; chybějící podpora S256 dál končí `AUTH`. JSON i SSE odpověď musí mít ID odeslaného požadavku; boolean `true` není číselné ID `1`. Při čtení tokenu z podporované TOML sekce může být hodnota v dvojitých uvozovkách i apostrofech.
+
+Oprava z 2. 11. 2026 vyžaduje právě jedno z polí `result` a `error`: výsledek musí být objekt, chyba musí mít celočíselný `code` a textový `message`. Handshake kontroluje typy povinných polí a seznam nástrojů. `tools/call` vyžaduje pole `content`, objekty s textovým `type`, textový `text` u textových bloků a případné boolean `isError`. Vadné tvary skončí `TRANSPORT` / 3 místo pádu nebo falešného `OK`. Platné prázdné `content: []` zůstává povolené; platné chyby serveru a nástroje zachovávají kódy 4 a 5. Syntetické regresní testy pokrývají JSON i SSE. Jde o kontrolu polí používaných diagnostikou, nikoli úplnou validaci všech vnořených MCP schémat.
 
 ```bash
 python3 -m unittest discover -s tools/mcp-smoke/tests -p 'test_*.py' -v

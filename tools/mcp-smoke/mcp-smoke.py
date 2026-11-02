@@ -167,10 +167,17 @@ class McpClient:
         if (not isinstance(response, dict) or response.get("jsonrpc") != "2.0"
                 or isinstance(response.get("id"), bool) or response.get("id") != msg_id):
             raise SmokeError("TRANSPORT", "%s: no JSON-RPC response for id %d (%s)" % (method, msg_id, ctype))
+        if ("result" in response) == ("error" in response):
+            raise SmokeError("TRANSPORT", "%s: expected exactly one of result or error" % method)
         if "error" in response:
             err = response["error"]
+            if (not isinstance(err, dict) or type(err.get("code")) is not int
+                    or not isinstance(err.get("message"), str)):
+                raise SmokeError("TRANSPORT", "%s: invalid JSON-RPC error" % method)
             raise SmokeError("PROTOCOL", "%s: JSON-RPC %s %s" % (method, err.get("code"), err.get("message")))
-        return response.get("result")
+        if not isinstance(response["result"], dict):
+            raise SmokeError("TRANSPORT", "%s: result must be an object" % method)
+        return response["result"]
 
     def handshake(self):
         result = self.request("initialize", {
@@ -178,21 +185,36 @@ class McpClient:
             "capabilities": {},
             "clientInfo": {"name": "dokturek-mcp-smoke", "version": "1"},
         })
-        self.protocol_version = result.get("protocolVersion")
-        info = result.get("serverInfo", {})
+        info = result.get("serverInfo")
+        if (not isinstance(result.get("protocolVersion"), str)
+                or not isinstance(result.get("capabilities"), dict)
+                or not isinstance(info, dict)
+                or not all(isinstance(info.get(key), str) for key in ("name", "version"))):
+            raise SmokeError("TRANSPORT", "initialize: invalid protocolVersion, capabilities or serverInfo")
+        self.protocol_version = result["protocolVersion"]
         log("OK", "initialize", "%s %s, protocol %s, session %s" % (
             info.get("name"), info.get("version"), self.protocol_version,
             "stateful" if self.session_id else "stateless"))
         status = self.notify("notifications/initialized")
         log("OK", "notifications/initialized", "HTTP %d" % status)
-        tools = self.request("tools/list").get("tools", [])
-        names = sorted(t.get("name") for t in tools)
+        tools = self.request("tools/list").get("tools")
+        if (not isinstance(tools, list) or any(
+                not isinstance(t, dict) or not isinstance(t.get("name"), str)
+                or not isinstance(t.get("inputSchema"), dict) for t in tools)):
+            raise SmokeError("TRANSPORT", "tools/list: invalid tools array")
+        names = sorted(t["name"] for t in tools)
         log("OK", "tools/list", "%d tools" % len(names))
         return names
 
     def call_tool(self, name, arguments):
         result = self.request("tools/call", {"name": name, "arguments": arguments})
-        texts = [c.get("text", "") for c in result.get("content", []) if c.get("type") == "text"]
+        content = result.get("content")
+        if (not isinstance(content, list) or any(
+                not isinstance(c, dict) or not isinstance(c.get("type"), str)
+                or (c["type"] == "text" and not isinstance(c.get("text"), str)) for c in content)
+                or not isinstance(result.get("isError", False), bool)):
+            raise SmokeError("TRANSPORT", "tools/call %s: invalid content or isError" % name)
+        texts = [c["text"] for c in content if c["type"] == "text"]
         if result.get("isError"):
             raise SmokeError("TOOL", "%s: %s" % (name, " ".join(texts)[:400]))
         return result, texts

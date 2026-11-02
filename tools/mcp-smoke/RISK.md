@@ -28,12 +28,14 @@ Riziko: **vysoké**. Skript sice jen čte metadata, ale používá osobní OAuth
 | Povinné FHIR metadata musí být JSON objekt typu `CapabilityStatement`, jinak návratový kód 5; diagnostická absolutní cesta pouze varuje | skript, regresní testy |
 | Při obnově z uloženého tokenu i při `--check-refresh` se náhradní token uloží a neúspěšný zápis vypíše varování; `--no-store` úložiště obchází | skript, regresní testy |
 | OAuth discovery musí být JSON objekt s povinnými textovými poli; JSON i SSE odpovědi se párují podle ID a odmítají boolean ID | skript, regresní testy |
+| JSON-RPC obálka a používaná pole handshake, seznamu nástrojů a výsledku volání musí mít očekávaný tvar; vadná odpověď končí `TRANSPORT` / 3 | skript, syntetické regresní testy JSON/SSE |
 | Allowlist povoluje schváleného hostitele Coolify; ostatní hostitelé zůstávají omezení | `scripts/check_repo.py` |
 
 ## Co ochrany nepokrývají
 
 - Živé volání s reálnými tokeny nebylo při přesunu ověřeno. Původní ověřovací záznamy v README jsou datované k 29. 10. 2026.
 - Kontrola `CapabilityStatement` nevaliduje celý FHIR zdroj ani funkčnost klinických operací. Úspěch diagnostiky není přejímka integrace.
+- Kontrola MCP odpovědí nevaliduje všechna vnořená schémata, obsah netextových bloků ani věcnou správnost výsledku nástroje. Platné prázdné `content: []` je povolené.
 - Regresní testy používají syntetické tokeny a simulované úložiště; funkčnost macOS Keychainu a libsecret na tvém stroji neověřují.
 - Allowlist je statická kontrola repozitáře, ne síťová izolace. Neomezuje oprávnění tokenu, discovery endpointy ani chování vzdáleného serveru.
 
@@ -47,4 +49,5 @@ Skript ukonči přes Ctrl+C. Pro další běhy použij `--no-store`; to již ulo
 - Poslední revize: 2026-10-30 — Petr výslovně schválil přidání `coolify.infra.dokturek.ai` do allowlistu pro stávající MCP diagnostiku. Samostatný bezpečnostní commit mění pouze allowlist a tento popis rizik; nemění prostředí ani oprávnění serveru.
 - Opravy skriptu: 2026-10-30 — povinná kontrola FHIR metadat a ukládání rotovaného refresh tokenu, včetně regresních testů bez živých přístupů.
 - Revize oprav: 2026-11-01 — varování při druhém uložení tokenu, validace OAuth discovery a ID odpovědí JSON/SSE včetně boolean hodnot; ověřeno syntetickými testy.
+- Revize oprav: 2026-11-02 — validace JSON-RPC `result`/`error` a používaných polí MCP výsledků; regresní testy pro neplatné odpovědi i zachování návratových kódů platných odpovědí.
 - Revize nejpozději při opravě známých omezení, změně hostitele, OAuth klientů, Medplumu nebo dostupných nástrojů Coolify.
