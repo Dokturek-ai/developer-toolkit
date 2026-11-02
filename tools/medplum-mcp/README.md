@@ -78,6 +78,8 @@ Claude Desktop nepřipojí vzdálený server zapsaný přímo v `claude_desktop_
 
 Most ukládá tokeny do `~/.mcp-auth/`. Most i Claude Code používají callback port 1458 — nepřihlašuj se v obou ve stejnou chvíli.
 
+Instalátor ve verzi 0.1.1 při odlišné existující konfiguraci nevypisuje její obsah, který může obsahovat secrets. Náhradu musíš výslovně povolit přepínačem `--force`; bez něj se konfigurace nezmění ani s `--apply`.
+
 ### Codex
 
 1. Přidej do `~/.codex/config.toml` obsah [`clients/codex.toml`](clients/codex.toml).

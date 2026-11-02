@@ -102,8 +102,7 @@ def main():
             print("Server {} je už nastavený přesně podle šablony. Nic se nemění.".format(SERVER))
             return 0
         if current is not None and not args.force:
-            print("Server {} už v konfiguraci je, ale liší se od šablony:".format(SERVER))
-            print(json.dumps(current, indent=2, ensure_ascii=False))
+            print("Server {} už v konfiguraci je, ale liší se od šablony.".format(SERVER))
             print("Když ho chceš nahradit, spusť skript s --force.")
             return 2
         servers[SERVER] = entry

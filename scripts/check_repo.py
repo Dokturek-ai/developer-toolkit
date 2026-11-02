@@ -24,6 +24,7 @@ TEMPLATE_DIR = "_template"
 # Hostitelé *.dokturek.ai povolení v nástrojích. Přidání hostitele je bezpečnostní
 # změna: samostatný commit, zdůvodnění v PR, aktualizovaný RISK.md (viz CONTRIBUTING.md).
 ALLOWED_DOKTUREK_HOSTS = {
+    "coolify.infra.dokturek.ai",
     "medplum.test.dokturek.ai",
     "app.test.dokturek.ai",
 }
