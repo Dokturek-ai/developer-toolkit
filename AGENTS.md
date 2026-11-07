@@ -12,3 +12,4 @@ Repo obsahuje nástroje s přístupem k datům a k Medplumu. Každou změnu ber 
 - Před commitem spusť `python3 scripts/check_repo.py` a `for d in tools/*/tests; do python3 -m unittest discover -s "$d" -p 'test_*.py'; done`.
 - Skripty musí běžet na Pythonu 3.9 (systémový `python3` na macOS) jen se standardní knihovnou.
 - Dokumentace je česky, tykáním, technické termíny anglicky. Kód a identifikátory anglicky.
+- Centrální dokumentace je v repu `dokturek-docs`. Každý PR s novou funkcí odkazuje na PR v `dokturek-docs`, nebo uvádí „netýká se“.

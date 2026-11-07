@@ -10,6 +10,7 @@
 
 - [ ] `python3 scripts/check_repo.py` a unit testy prošly
 - [ ] `README.md` a `RISK.md` nástroje odpovídají změně
+- [ ] Dokumentace v dokturek-docs: odkaz na PR, nebo „netýká se“
 - [ ] Verze zvýšená v `plugin.json` i v `marketplace.json` (pokud se mění nástroj)
 - [ ] Žádné tokeny, secrets ani data pacientů
 - [ ] Nový hostitel nebo prostředí: zdůvodnění níže, samostatný commit
