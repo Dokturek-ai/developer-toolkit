@@ -8,8 +8,8 @@ Než začneš, přečti [RISK.md](RISK.md). Nástroj umí i mazat.
 
 | Tool | Co dělá |
 |---|---|
-| `fhir-request` | Libovolný požadavek na FHIR R4 API: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`. `path` je relativní k `/fhir/R4/`, např. `Patient?name=Novak` nebo `metadata`. Prázdná `path` míří na base URL (batch a transaction Bundle). |
-| `search`, `fetch` | V Medplum 5.2.1 vrací jen zástupný dokument — existují kvůli kompatibilitě s ChatGPT. Pro FHIR dotazy je nepoužívej. |
+| `fhir-request` | Požadavky na FHIR R4 API podle oprávnění účtu: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`. `path` je relativní k `/fhir/R4/`, např. `metadata` nebo `CodeSystem?_summary=count`. Prázdná `path` míří na base URL (batch a transaction Bundle). |
+| `search`, `fetch` | Nástroje pro kompatibilitu s ChatGPT. Pro vyhledávání FHIR dat použij `fhir-request`. |
 
 ## Předpoklady
 
@@ -82,7 +82,7 @@ Instalátor ve verzi 0.1.1 při odlišné existující konfiguraci nevypisuje je
 
 ### Codex
 
-1. Přidej do `~/.codex/config.toml` obsah [`clients/codex.toml`](clients/codex.toml).
+1. Přidej do `~/.codex/config.toml` obsah [`clients/codex.toml`](clients/codex.toml). Pokud už máš sekci `[mcp_servers.dokturek-medplum-dev]`, uprav ji na místě. Ukázka obsahuje URL serveru i nastavení OAuth callbacku.
 2. Přihlas se:
 
    ```bash
@@ -95,7 +95,7 @@ Callback URL v `codex.toml` končí ID odvozeným z URL serveru (prvních 9 bajt
 
 ### ChatGPT
 
-Callback ChatGPT konektoru je jiný pro každé spojení, takže každé nové spojení vyžaduje registraci redirectu na serveru. Toolkit tuhle cestu nepokrývá.
+Pokud už máš v aplikaci připojení Doktůrek Medplum, přihlas se přes něj a použij čtecí dotaz z kroku 3 níže. Každé nové spojení vyžaduje registraci jeho přesné callback URL na serveru. [Nastavení ChatGPT a OAuth klienta](https://github.com/Dokturek-ai/dokturek-medplum/blob/main/integrations/openai/README.md#chatgpt)
 
 ## Ověření
 
@@ -133,11 +133,9 @@ Smoke test posílá jen čtecí požadavky. `--e2e` se přihlašuje přes most, 
 
 ## Známé omezení
 
-Obnova tokenu přes refresh token u Medplum klientů z `MEDPLUM_DEFAULT_OAUTH_CLIENTS` nefunguje. Grant `refresh_token` v Medplumu hledá klienta jen v databázi (`systemRepo.readResource` v `handleRefreshToken`, `packages/server/src/oauth/token.ts`), ne mezi výchozími klienty z konfigurace — a vrátí `Invalid client`. Týká se to Medplum 5.2.1 i aktuální verze 5.2.8. Authorization code flow funguje, protože používá `getClientApplication`.
+U výchozích OAuth klientů z `MEDPLUM_DEFAULT_OAUTH_CLIENTS` se na Medplumu 5.2.15 bez opravy podařilo lokálně reprodukovat chybu obnovy tokenu `Invalid client`. Oprava je v `dokturek-medplum`. Její nasazení a obnova relace v připojené aplikaci zatím zůstávají neověřené. [Oprava a ověření](https://github.com/Dokturek-ai/dokturek-medplum/pull/40)
 
-Nástroj proto žádá scope `openid profile` bez `offline_access`. Klient tak refresh token nedostane a po vypršení access tokenu (1 hodina) se přihlásí znovu, místo aby opakovaně narážel na chybu. S `offline_access` most `mcp-remote` při každém startu spadne, dokud token ručně nesmažeš.
-
-Až bude oprava v Medplumu nasazená, vrátí se `offline_access` do scope a přihlášení bude vydržet.
+Pro běžné připojení přes toolkit používej scope `openid profile`. Po vypršení access tokenu se přihlas znovu. Pokud most `mcp-remote` použije starý refresh token a vrátí `Invalid client`, postupuj podle tabulky výše.
 
 ## Odhlášení a odebrání
 
@@ -153,7 +151,7 @@ Smazání tokenu na disku nezneplatní relaci na serveru. Při podezření na ú
 | | |
 |---|---|
 | Endpoint | `https://medplum.test.dokturek.ai/mcp/stream` (Streamable HTTP) |
-| Medplum | 5.2.1 |
+| Medplum | `5.2.15-4d86215`, verze hlášená testovacím serverem 19. 11. 2026 |
 | OAuth | authorization code + PKCE (S256), veřejní klienti bez secretu |
 | Scope | `openid profile` |
 | Platnost access tokenu | 1 hodina, refresh token se nepoužívá (viz Známé omezení) |
