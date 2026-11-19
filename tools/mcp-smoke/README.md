@@ -2,7 +2,7 @@
 
 > Interní vývojářský nástroj přesunutý z `dokturek-docs` PR #21 (revize `3154d8025710e60b526ebc62de0e4149ea751d57`) dne 30. 10. 2026. Před použitím si přečti [RISK.md](RISK.md); živé ověření zůstává otevřené. Příkazy níže spouštěj z kořene `developer-toolkit`.
 
-> **Datum:** 2026-10-29. **Stav:** konfigurace a ověřovací skript jsou hotové. Ověření end-to-end s reálnými tokeny čeká na běh na Petrově Macu (§6).
+> Původní síťové sondy v tomto návodu jsou z 29. 10. 2026. Dne 19. 11. 2026 vrátil připojený testovací konektor v aplikaci FHIR metadata s verzí `5.2.15-4d86215`, počet číselníků přes `fhir-request` a zástupný dokument přes `search`. Samostatný skript i obnova relace v aplikaci čekají na ověření s reálnými přístupy (§6).
 > **Značky:** [Z] zjištěno (kód, odpověď serveru, test), [N] neověřeno, [P] návrh.
 > **Zdroje:** Medplum `v5.2.1` (`e0db1fc`, stejný build hlásí `/healthcheck`), `@modelcontextprotocol/sdk` 1.30.1 (verze pinovaná v Medplum serveru), `Dokturek-ai/dokturek-medplum` `18b53e7` (`integrations/openai/`), Claude Code 2.1.312.
 
@@ -11,7 +11,7 @@
 | Server | URL | Transport | Autentizace |
 |---|---|---|---|
 | Coolify self-hosted | `https://coolify.infra.dokturek.ai/mcp` | Streamable HTTP | `Authorization: Bearer <COOLIFY_API_TOKEN>` |
-| Medplum dev | `https://medplum.test.dokturek.ai/mcp/stream` | Streamable HTTP, bezstavový (bez `Mcp-Session-Id`) | OAuth 2.0 Authorization Code + PKCE S256, scope `openid profile offline_access` |
+| Medplum dev | `https://medplum.test.dokturek.ai/mcp/stream` | Streamable HTTP, bezstavový (bez `Mcp-Session-Id`) | OAuth 2.0 Authorization Code + PKCE S256. Pro běžné připojení přes toolkit `openid profile`. |
 
 Odpovědi z 29. 10. 2026 bez tokenu [Z]:
 
@@ -42,14 +42,9 @@ Všichni jsou veřejní klienti bez secretu, s povinným PKCE a výchozím scope
 claude mcp add-json --scope user coolify-selfhosted '{"type":"http","url":"https://coolify.infra.dokturek.ai/mcp","headers":{"Authorization":"Bearer ${COOLIFY_API_TOKEN}"}}'
 ```
 
-```bash
-claude mcp add-json --scope user dokturek-medplum-dev '{"type":"http","url":"https://medplum.test.dokturek.ai/mcp/stream","oauth":{"clientId":"dokturek-claude-code-dev","callbackPort":1458,"scopes":"openid profile offline_access"}}'
-```
+`${COOLIFY_API_TOKEN}` se rozvine až při připojení. Do `~/.claude.json` se zapíše jen zástupný text. Ověřeno lokálním echo serverem: Claude Code 2.1.312 poslal `Bearer <hodnota proměnné>` [Z]. Token stačí exportovat v shellu, ze kterého se `claude` spouští. Na Macu ho lze vzít z Keychainu, nikdy ne z repozitáře.
 
-- `${COOLIFY_API_TOKEN}` se rozvine až při připojení. Do `~/.claude.json` se zapíše jen zástupný text. Ověřeno lokálním echo serverem: Claude Code 2.1.312 poslal `Bearer <hodnota proměnné>` [Z]. Token stačí exportovat v shellu, ze kterého se `claude` spouští. Na Macu ho lze vzít z Keychainu, nikdy ne z repozitáře.
-- Medplum: přihlášení se spouští z `/mcp`, callback je `http://localhost:1458/callback`. `oauth.scopes` přepíše scope z discovery, protože ten `offline_access` neobsahuje. Tokeny ukládá Claude Code ve vlastním úložišti, na macOS v Keychainu [N, dokumentace to pro MCP tokeny výslovně neuvádí]. `claude mcp get dokturek-medplum-dev` po přidání ukazuje `Needs authentication` a `client_id configured, callback_port 1458` [Z].
-- Port 1458 nesmí současně používat jiný klient (například most `mcp-remote` pro Claude Desktop).
-- Ostatní agenti: Codex používá `[mcp_servers.dokturek-medplum-dev.oauth]` s `callback_port = 1457` a `codex mcp login … --scopes openid,profile,offline_access`. Claude Desktop používá nativní konektor. ChatGPT používá vlastní MCP spojení s `token_endpoint_auth_method=none`. Postupy jsou v `dokturek-medplum/integrations/openai/README.md`.
+Pro připojení k Medplumu z Claude Code, Claude Desktop, Codexu nebo ChatGPT použij [návod k medplum-mcp](../medplum-mcp/README.md#nastavení).
 
 ## 4. Nálezy k chybě `-32603 Internal error`
 
@@ -63,30 +58,19 @@ Na replice se stejným SDK skončí zdvojená cesta jako chyba nástroje (`isErr
 
 ### N2. `search` a `fetch` jsou atrapy [Z]
 
-Oba nástroje vždy vracejí pevný `dummy-doc` a na serveru nemají jak selhat. Existují jen kvůli požadavku ChatGPT. Pro FHIR dotazy se používá pouze `fhir-request`.
+Původní server vracel pevný `dummy-doc`. V připojené aplikaci vrátil `search` zástupný dokument i 19. 11. 2026. Pro FHIR dotazy použij `fhir-request`.
 
-### N3. Server Medplum `-32603` u `tools/call` nevrací [Z]
+### N3. Původní chybu `-32603` se nepodařilo při opakování potvrdit
 
 SDK 1.30.1 výjimku z handleru nástroje převede na výsledek s `isError: true` (`dist/cjs/server/mcp.js:144`). Neznámý nástroj skončí také jako `isError` (`-32602` v textu).
 
 Replika `mcp/routes.ts` a `mcp/server.ts` (bezstavový `StreamableHTTPServerTransport`) to potvrdila: `initialize`, `notifications/initialized` (`202`), `tools/list` i `search` prošly.
 
-Protože `search` selhat nemůže, **`-32603` hlášené u `search` i `fhir-request` téměř jistě vzniká v hostitelském konektoru**. Konektor tak hlásí neúspěšné volání na upstream [P].
+Pozdější `GET metadata` z připojené aplikace prošel. Příčina dřívějšího `-32603` zůstává neověřená. K jejímu určení je potřeba skutečná konfigurace aplikace a související záznamy serveru ze stejného času. [Výsledek diagnostiky](https://github.com/Dokturek-ai/dokturek-medplum/pull/40)
 
-### N4. Refresh token pro výchozí klienty nefunguje (Medplum 5.2.1–5.2.8) [Z]
+### N4. Obnova tokenu výchozího klienta může vrátit `Invalid client`
 
-`handleRefreshToken` čte klienta přes `systemRepo.readResource('ClientApplication', …)` (`packages/server/src/oauth/token.ts`). Klienti z `defaultOAuthClients` v databázi nejsou, takže výsledkem je `invalid_request: Invalid client`.
-
-Refresh token se vydá, ale nedá se použít. Po vypršení access tokenu (výchozí doba 1 h [N pro toto nasazení]) konektor nemá jak token obnovit. Nejpravděpodobnější vysvětlení `-32603` je tedy **chyba autentizace maskovaná konektorem** [P]: připojení a `tools/list` proběhnou s čerstvým tokenem, pozdější volání nástrojů selžou.
-
-Ověří se to během pod §6: po čerstvém přihlášení musí `fhir-request GET metadata` projít a `--check-refresh` musí vrátit `Invalid client`.
-
-**Náprava [P]**, jedna z možností:
-
-1. upstream oprava `token.ts` (`getClientApplication` místo `readResource`) a upgrade Medplumu;
-2. pro dev založit `ClientApplication` jako skutečný zdroj v Projectu se stejnými `redirectUris` a agentům dát jeho `id`. DCR se pak nepoužije, protože `client_id` je pevné.
-
-Do té doby počítat s novým přihlášením po vypršení access tokenu.
+Lokální test Medplumu 5.2.15 bez opravy reprodukoval `Invalid client` při obnově tokenu výchozího klienta z `defaultOAuthClients`. Po opravě obnovu ověřil lokální test. Nasazení opravy a obnova tokenu v připojené aplikaci zůstávají neověřené. [Oprava a ověření](https://github.com/Dokturek-ai/dokturek-medplum/pull/40)
 
 ## 5. Ověřovací skript `mcp-smoke.py`
 
@@ -135,7 +119,7 @@ python3 tools/mcp-smoke/mcp-smoke.py medplum --check-refresh
 Očekávaný výsledek:
 
 - Coolify: všechny kroky `OK`.
-- Medplum: `fhir-request GET metadata` vrátí `CapabilityStatement`, `GET /fhir/R4/metadata` skončí jako `WARN … TOOL` (N1) a `refresh_token grant` skončí jako `FAIL AUTH … Invalid client` (N4), takže skript skončí kódem 2.
-- Pokud Medplum hned po přihlášení vrátí `PROTOCOL -32603`, hypotéza N4 neplatí a chyba je na straně serveru. Pak je potřeba dohledat `x-request-id` v logu Medplumu.
+- Medplum: `fhir-request GET metadata` vrátí `CapabilityStatement`. Výsledek `--check-refresh` vyhodnoť zvlášť. `FAIL AUTH … Invalid client` znamená, že server obnovu odmítl, a skript skončí kódem 2.
+- Pokud se vrátí `PROTOCOL -32603`, zaznamenej čas a dostupné ID požadavku a porovnej je s logy serveru a konektoru.
 
 V cloudové session 29. 10. nebyl k dispozici `COOLIFY_API_TOKEN` ani přihlášení do Medplumu v prohlížeči. Proto se volání nástrojů s reálnými tokeny zatím neprovedla [N].
