@@ -1,13 +1,14 @@
 {
-  "description": "medplum-mcp: každé volání fhir-request s jinou metodou než GET vyžaduje potvrzení uživatelem.",
+  "description": "medplum-mcp: zápisy, citlivá čtení a neznámé nástroje Medplum MCP vyžadují potvrzení; únik z /fhir/R4/ je zamítnutý.",
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "mcp__plugin_medplum-mcp_medplum-dev__fhir-request",
+        "matcher": "mcp__.*[Mm][Ee][Dd][Pp][Ll][Uu][Mm].*__.*",
         "hooks": [
           {
             "type": "command",
-            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/confirm-writes.sh\""
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/confirm-writes.sh\"",
+            "timeout": 20
           }
         ]
       }

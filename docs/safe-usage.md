@@ -4,7 +4,7 @@ Nástroje z toolkitu pracují s daty a s oprávněními tvého účtu. Tahle pra
 
 ## Prostředí a data
 
-Nástroje míří na testovací prostředí (dev-pre-production). Produkční endpoint v toolkitu není a `scripts/check_repo.py` v CI odmítne každého hostitele, který není v allowlistu.
+Nástroje míří na testovací prostředí (dev-pre-production). Klinický produkční endpoint v toolkitu není a `scripts/check_repo.py` v CI odmítne každého hostitele, který není v allowlistu. Allowlist ale obsahuje Coolify (`coolify.infra.dokturek.ai`), který spravuje i produkční služby; pracuj s ním jen přes `mcp-smoke` a s tokenem, který smí jen číst.
 
 V testovacím prostředí pracuj jen se syntetickými daty. Když narazíš na data, která vypadají jako skutečná data pacientů, nástroj dál nepoužívej a dej vědět vlastníkovi nástroje.
 

@@ -129,7 +129,7 @@ Smoke test posílá jen čtecí požadavky. `--e2e` se přihlašuje přes most, 
 | Po hodině je potřeba nové přihlášení | Známé omezení Medplumu, viz níže | Přihlas se znovu (`/mcp`, restart Claude Desktopu, `codex mcp login`) |
 | Most v Claude Desktopu nebo `smoke_test.py --e2e` padá s `Invalid client` | V `~/.mcp-auth/` zůstal refresh token ze starší konfigurace | Přesuň `~/.mcp-auth/mcp-remote-v1/13e0418b9b881fb80d3e1bb146eebf29_tokens.json` do koše a restartuj Desktop |
 | Instalační skript skončí s „Claude Desktop běží“ | Desktop by změnu přepsal | Ukonči Desktop (Cmd+Q) a spusť skript znovu |
-| `fhir-request` vrací `Invalid path` | `path` je absolutní URL | Použij cestu relativní k `/fhir/R4/` |
+| Hook zamítl `fhir-request` s hláškou „může opustit /fhir/R4/“ | `path` je absolutní URL nebo obsahuje `..` či kódovaný znak; server sám takovou cestu neodmítne (viz RISK.md) | Použij cestu relativní k `/fhir/R4/` |
 
 ## Známé omezení
 

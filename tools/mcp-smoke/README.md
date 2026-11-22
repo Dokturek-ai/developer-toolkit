@@ -38,6 +38,9 @@ Všichni jsou veřejní klienti bez secretu, s povinným PKCE a výchozím scope
 
 ## 3. Konfigurace Claude Code (user scope, tokeny mimo repozitář)
 
+> [!WARNING]
+> Coolify spravuje i produkční služby. Připojený agent může přes nástroje Coolify MCP měnit infrastrukturu a žádný hook toolkitu ho nehlídá. Používej token, který smí jen číst, nepovoluj nástroje Coolify MCP trvale a potvrzuj každé volání. Bez tohoto omezení agenta nepřipojuj.
+
 ```bash
 claude mcp add-json --scope user coolify-selfhosted '{"type":"http","url":"https://coolify.infra.dokturek.ai/mcp","headers":{"Authorization":"Bearer ${COOLIFY_API_TOKEN}"}}'
 ```
