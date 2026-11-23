@@ -4,7 +4,7 @@ Nástroje z toolkitu pracují s daty a s oprávněními tvého účtu. Tahle pra
 
 ## Prostředí a data
 
-Nástroje míří na testovací prostředí (dev-pre-production). Produkční endpoint v toolkitu není a `scripts/check_repo.py` v CI odmítne každého hostitele, který není v allowlistu.
+Nástroje míří na testovací prostředí (dev-pre-production). Klinický produkční endpoint v toolkitu není a `scripts/check_repo.py` v CI odmítne každého hostitele `*.dokturek.ai` mimo allowlist, jeho podvržené tvary a v konfiguraci i kódu každou URL na neschváleného hostitele. Allowlist ale obsahuje Coolify (`coolify.infra.dokturek.ai`), který spravuje i produkční služby; pracuj s ním jen přes `mcp-smoke` a s tokenem, který smí jen číst.
 
 V testovacím prostředí pracuj jen se syntetickými daty. Když narazíš na data, která vypadají jako skutečná data pacientů, nástroj dál nepoužívej a dej vědět vlastníkovi nástroje.
 
@@ -14,7 +14,7 @@ Všechno, co agent přečte, se stává součástí konverzace a odchází k pos
 
 Každý se přihlašuje vlastním účtem přes OAuth. Sdílené účty ani sdílené tokeny toolkit nepoužívá.
 
-Tokeny ukládá klient: Claude Code ve svém úložišti credentials, most `mcp-remote` pro Claude Desktop v `~/.mcp-auth/`, Codex ve svém úložišti. Tokeny nekopíruj, neposílej a necommituj. Refresh token, pokud ho nástroj používá, platí, dokud ho neodvoláš nebo nevyprší.
+Tokeny ukládá klient: Claude Code ve svém úložišti credentials, most `mcp-remote` pro Claude Desktop v `~/.mcp-auth/`, Codex ve svém úložišti. Tokeny nekopíruj, neposílej a necommituj. Konfigurace `medplum-mcp` refresh token nežádají (scope bez `offline_access`). Diagnostika `mcp-smoke` ho žádá a ukládá do macOS Keychainu nebo libsecret, s `--no-store` ho neuloží. Refresh token platí, dokud ho neodvoláš nebo nevyprší.
 
 ## Oprávnění a potvrzování
 

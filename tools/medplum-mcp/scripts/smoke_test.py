@@ -2,16 +2,23 @@
 """Read-only smoke test pro medplum-mcp.
 
 Bez přepínačů ověří části, které nevyžadují přihlášení: healthcheck Medplumu,
-že MCP endpoint bez tokenu vrací 401, OAuth discovery a registraci klientů
-(POST /oauth2/register v Medplum 5.2.1 nic nevytváří, jen vrátí klienta
-podle redirect URI).
+že MCP endpoint bez tokenu vrací 401, OAuth discovery a registraci klientů.
+
+FHIR data skript jen čte. Jediná záměrná výjimka z pravidla „jen GET“
+v AGENTS.md je sonda DCR: POST /oauth2/register bez tokenu pro každou
+očekávanou redirect URI. Medplum 5.2.1 při DCR nic neregistruje, jen podle
+redirect URI vyhledá klienta v MEDPLUM_DEFAULT_OAUTH_CLIENTS a vrátí ho.
+Další POST jde jen na MCP endpoint (JSON-RPC initialize bez tokenu, čeká se
+401; s --e2e přes most initialize, tools/list a tools/call s GET).
 
 S --e2e projde celou cestu přes stdio most mcp-remote se stejnými parametry
 jako Claude Desktop: OAuth přihlášení v prohlížeči, initialize, tools/list
-a jeden dotaz GET CodeSystem?_summary=count. Skript neposílá zápisové požadavky.
+a jeden dotaz GET CodeSystem?_summary=count. Do FHIR nic nezapisuje. Log mostu
+skript po úspěšném běhu smaže; při chybě ho nechá pro diagnostiku.
 """
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -97,6 +104,7 @@ def e2e_checks(report):
         return
     server = json.loads(TEMPLATE.read_text(encoding="utf-8"))["mcpServers"]["dokturek-medplum-dev"]
     command = [npx] + server["args"] + ["--auth-timeout", "300"]
+    failures_before = report.failures
     log = tempfile.NamedTemporaryFile(prefix="medplum-mcp-bridge-", suffix=".log", delete=False)
     print("Most mcp-remote: log v {}. Pokud se otevře prohlížeč, přihlas se do Medplumu.".format(log.name))
     process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=log,
@@ -113,6 +121,7 @@ def e2e_checks(report):
                 return message
         return {"error": "most skončil, detail v {}".format(log.name)}
 
+    completed = False
     try:
         send(INITIALIZE)
         reply = receive(1)
@@ -132,12 +141,27 @@ def e2e_checks(report):
         report.check("GET CodeSystem?_summary=count",
                      bundle.get("resourceType") == "Bundle" and isinstance(bundle.get("total"), int),
                      "total = {}".format(bundle.get("total")))
+        completed = True
     finally:
         process.terminate()
         try:
             process.wait(timeout=10)
         except subprocess.TimeoutExpired:
             process.kill()
+            process.wait()
+        log.close()
+        finish_log(log.name, completed and report.failures == failures_before)
+
+
+def finish_log(path, success):
+    """Po úspěchu log mostu smaže, při chybě ho nechá pro diagnostiku."""
+    if not success:
+        print("Log mostu zůstává pro diagnostiku: {}. Po přečtení ho smaž.".format(path))
+        return
+    try:
+        os.unlink(path)
+    except OSError as error:
+        print("Log mostu {} se nepodařilo smazat: {}".format(path, error))
 
 
 def main():

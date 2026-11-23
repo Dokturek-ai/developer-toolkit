@@ -32,7 +32,7 @@ V `/mcp` vyber `plugin:medplum-mcp:medplum-dev` a přihlas se svým Medplum úč
 
 Celé znění je v [docs/safe-usage.md](docs/safe-usage.md). Zkráceně:
 
-1. Jen testovací prostředí a syntetická data. Produkční endpoint toolkit neobsahuje a kontrola v CI ho do nástrojů nepustí.
+1. Jen testovací prostředí a syntetická data. Klinický produkční endpoint toolkit neobsahuje a kontrola v CI ho do nástrojů nepustí. Výjimka: `mcp-smoke` mluví s Coolify, který spravuje i produkční služby (viz jeho [RISK.md](tools/mcp-smoke/RISK.md)).
 2. Každý se přihlašuje vlastním účtem. Tokeny se nesdílí, nekopírují a necommitují.
 3. Zápisy do dat potvrzuješ ručně, u každého volání.
 4. Když něco nesedí — reálná data v testu, podezření na únik tokenu — přestaň nástroj používat a postupuj podle [SECURITY.md](SECURITY.md).
@@ -44,7 +44,8 @@ Celé znění je v [docs/safe-usage.md](docs/safe-usage.md). Zkráceně:
 tools/<nástroj>/                  jeden nástroj = jeden adresář (README.md, RISK.md, konfigurace, skripty)
 tools/_template/                  šablona pro nový nástroj
 docs/safe-usage.md                pravidla používání
-scripts/check_repo.py             kontroly repa (allowlist hostitelů, připnuté verze, secrets, struktura)
+scripts/check_repo.py             kontroly repa (allowlist hostitelů a URL, připnuté verze, secrets, struktura)
+scripts/tests/                    unit testy kontrol repa
 ```
 
 ## Nový nástroj

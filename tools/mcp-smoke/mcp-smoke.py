@@ -34,10 +34,16 @@ import webbrowser
 COOLIFY_URL = "https://coolify.infra.dokturek.ai/mcp"
 MEDPLUM_URL = "https://medplum.test.dokturek.ai/mcp/stream"
 MEDPLUM_DISCOVERY = "https://medplum.test.dokturek.ai/.well-known/oauth-authorization-server"
-# Registered in dokturek-medplum integrations/openai/oauth-clients.dev.json.
+# OAuth endpoints from discovery must live on this exact host: the stored refresh token and the
+# authorization code are sent there, so a tampered discovery document must not redirect them.
+MEDPLUM_HOST = urllib.parse.urlsplit(MEDPLUM_DISCOVERY).hostname
+# Registered in dokturek-medplum integrations/openai/oauth-clients.dev.json. Shared with the
+# medplum-mcp Claude Code configuration: revoking or changing this client affects both.
 MEDPLUM_CLIENT_ID = "dokturek-claude-code-dev"
 # Both loopback forms are registered; the IP literal avoids localhost -> ::1 surprises (RFC 8252 §7.3).
 MEDPLUM_REDIRECT_URI = "http://127.0.0.1:1458/callback"
+# Unlike medplum-mcp (openid profile), the smoke test asks for offline_access so that
+# --check-refresh can exercise the refresh_token grant; the refresh token goes to the OS keychain.
 MEDPLUM_SCOPE = "openid profile offline_access"
 KEYCHAIN_SERVICE = "dokturek-medplum-dev-mcp"
 PROTOCOL_VERSION = "2025-06-18"
@@ -399,6 +405,32 @@ def authorize_interactive(meta):
     })
 
 
+def check_oauth_endpoint(meta, field):
+    """Refuses an OAuth endpoint that is not https on exactly MEDPLUM_HOST (default port)."""
+    value = meta[field]
+    try:
+        url = urllib.parse.urlsplit(value)
+        port = url.port
+    except ValueError:
+        raise SmokeError("AUTH", "OAuth discovery %s is not a valid URL; refusing to use it" % field)
+    problems = []
+    if url.scheme != "https":
+        problems.append("scheme must be https")
+    if url.username is not None or url.password is not None:
+        problems.append("userinfo is not allowed")
+    if url.hostname != MEDPLUM_HOST:
+        problems.append("host must be exactly %s (got %r)" % (MEDPLUM_HOST, url.hostname))
+    if port not in (None, 443):
+        problems.append("port must be the default 443")
+    if url.fragment or "#" in value:
+        problems.append("fragment is not allowed")
+    if "\\" in value or any(ch.isspace() or ord(ch) < 32 or ord(ch) == 127 for ch in value):
+        problems.append("backslash, whitespace or control characters are not allowed")
+    if problems:
+        raise SmokeError("AUTH", "OAuth discovery %s rejected (%s); no credentials were sent" % (
+            field, "; ".join(problems)))
+
+
 def medplum_token(args):
     status, _, body = http_request(MEDPLUM_DISCOVERY)
     if status != 200:
@@ -416,6 +448,9 @@ def medplum_token(args):
         raise SmokeError("TRANSPORT", "OAuth discovery code_challenge_methods_supported must be a list of strings")
     if "S256" not in methods:
         raise SmokeError("AUTH", "authorization server does not advertise PKCE S256")
+    # Before the keychain is read: the stored refresh token must never reach another host.
+    for field in ("token_endpoint", "authorization_endpoint"):
+        check_oauth_endpoint(meta, field)
     log("OK", "OAuth discovery", meta["issuer"])
 
     stored = None if args.no_store else secret_store_get()

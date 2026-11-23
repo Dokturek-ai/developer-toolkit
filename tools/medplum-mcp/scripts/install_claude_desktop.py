@@ -6,11 +6,15 @@ v claude_desktop_config.json, proto se server spouští přes stdio most
 mcp-remote (šablona v clients/claude-desktop.json).
 
 Bez --apply skript jen vypíše, co by změnil. S --apply nejdřív zazálohuje
-konfiguraci (claude_desktop_config.json.bak-<čas>) a pak ji atomicky přepíše.
+konfiguraci (claude_desktop_config.json.bak-<čas>) a pak ji atomicky přepíše
+s oprávněním 0600. Když je konfigurace symlink (např. z dotfiles), zapíše do
+jeho cíle a symlink zachová; nefunkční symlink odmítne. Neplatný JSON nebo
+JSON, který není objekt, skript odmítne s chybou a nic nezapíše.
 Na macOS zápis odmítne, dokud Claude Desktop běží: běžící Desktop si drží
 vlastní kopii konfigurace a cizí změnu by později přepsal.
 """
 import argparse
+import contextlib
 import json
 import os
 import platform
@@ -56,24 +60,66 @@ def desktop_running():
     return any(line.strip().endswith("Claude.app/Contents/MacOS/Claude") for line in output.splitlines())
 
 
+class ConfigError(Exception):
+    """Konfiguraci nelze bezpečně načíst nebo zapsat; text je určený uživateli."""
+
+
+def resolve_target(path):
+    """Soubor, do kterého se opravdu zapíše: u symlinku jeho cíl, aby symlink zůstal."""
+    if not path.is_symlink():
+        return path
+    target = Path(os.path.realpath(str(path)))
+    if not target.exists():
+        raise ConfigError("{} je symlink na neexistující {}. Oprav symlink nebo ho odstraň a spusť "
+                          "skript znovu.".format(path, target))
+    if not target.is_file():
+        raise ConfigError("{} je symlink na {}, což není běžný soubor.".format(path, target))
+    return target
+
+
 def load_config(path):
-    if not path.exists():
+    target = resolve_target(path)
+    if not target.exists():
         return {}
-    return json.loads(path.read_text(encoding="utf-8"))
+    if not target.is_file():
+        raise ConfigError("{} není běžný soubor.".format(target))
+    try:
+        config = json.loads(target.read_text(encoding="utf-8"))
+    except (ValueError, UnicodeDecodeError) as error:
+        # ValueError zahrnuje json.JSONDecodeError; obsah souboru nevypisujeme, může mít secrets.
+        position = " (řádek {}, sloupec {})".format(error.lineno, error.colno) if hasattr(error, "lineno") else ""
+        raise ConfigError("{} není platný JSON{}. Oprav ho ručně, nebo ho přesuň stranou "
+                          "a spusť skript znovu. Nic se nezměnilo.".format(target, position))
+    if not isinstance(config, dict):
+        raise ConfigError("{} musí obsahovat JSON objekt, obsahuje {}. Nic se nezměnilo.".format(
+            target, type(config).__name__))
+    if not isinstance(config.get("mcpServers", {}), dict):
+        raise ConfigError("Pole mcpServers v {} musí být JSON objekt. Nic se nezměnilo.".format(target))
+    return config
 
 
 def write_config(path, config):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if path.exists():
-        backup = path.with_name(path.name + ".bak-" + time.strftime("%Y%m%d-%H%M%S"))
-        shutil.copy2(str(path), str(backup))
+    target = resolve_target(path)
+    if target != path:
+        print("Konfigurace je symlink, zapíšu do cíle: {}".format(target))
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.exists():
+        backup = target.with_name(target.name + ".bak-" + time.strftime("%Y%m%d-%H%M%S"))
+        shutil.copy2(str(target), str(backup))
+        # Záloha nese stejné údaje jako konfigurace, proto stejně přísná oprávnění.
+        os.chmod(str(backup), 0o600)
         print("Záloha: {}".format(backup))
-    fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=".claude_desktop_config.")
-    with os.fdopen(fd, "w", encoding="utf-8") as handle:
-        json.dump(config, handle, indent=2, ensure_ascii=False)
-        handle.write("\n")
-    os.chmod(tmp, 0o600)
-    os.replace(tmp, str(path))
+    fd, tmp = tempfile.mkstemp(dir=str(target.parent), prefix=".claude_desktop_config.")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(config, handle, indent=2, ensure_ascii=False)
+            handle.write("\n")
+        os.chmod(tmp, 0o600)
+        os.replace(tmp, str(target))
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.unlink(tmp)
+        raise
 
 
 def main():
@@ -85,7 +131,11 @@ def main():
     args = parser.parse_args()
 
     path = args.config or default_config_path()
-    config = load_config(path)
+    try:
+        config = load_config(path)
+    except ConfigError as error:
+        print("Chyba: {}".format(error), file=sys.stderr)
+        return 4
     servers = config.setdefault("mcpServers", {})
     current = servers.get(SERVER)
     print("Konfigurace: {}".format(path))
@@ -115,7 +165,11 @@ def main():
     if desktop_running():
         print("Claude Desktop běží a změnu by přepsal. Ukonči ho (Cmd+Q) a spusť skript znovu s --apply.")
         return 3
-    write_config(path, config)
+    try:
+        write_config(path, config)
+    except ConfigError as error:
+        print("Chyba: {}".format(error), file=sys.stderr)
+        return 4
     print("Hotovo. Spusť Claude Desktop.")
     return 0
 
