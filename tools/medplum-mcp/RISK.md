@@ -16,7 +16,7 @@ Riziko: **vysoké**. Agent čte i zapisuje do Medplumu v rozsahu tvého účtu, 
 - Smazání nebo přepsání dat (`DELETE`, `PUT`), i hromadně jedním batch nebo transaction Bundle.
 - Prompt injection: text uložený ve FHIR zdroji (poznámka, popis) může agenta navést k operaci, kterou jsi nezadal.
 - Únik dat do kontextu modelu, i při čistém čtení.
-- Únik tokenu z lokálního úložiště (`~/.mcp-auth/`, úložiště Claude Code nebo Codexu). Access token platí 1 hodinu. Refresh token nástroj nežádá (viz Známé omezení v README).
+- Únik tokenu z lokálního úložiště (`~/.mcp-auth/`, úložiště Claude Code nebo Codexu). Access token platí 1 hodinu. Konfigurace nástroje (Claude Code, most pro Claude Desktop, Codex) žádají jen scope `openid profile` bez `offline_access`, tedy bez refresh tokenu (viz Známé omezení v README). Starší konfigurace ho žádala; refresh token z ní může zůstat v `~/.mcp-auth/`. Diagnostika `mcp-smoke` `offline_access` žádá a refresh token ukládá do systémového úložiště, viz její [RISK.md](../mcp-smoke/RISK.md).
 - Konfigurace upravená tak, že míří na jiné prostředí.
 
 ## Ochrany
@@ -29,6 +29,7 @@ Riziko: **vysoké**. Agent čte i zapisuje do Medplumu v rozsahu tvého účtu, 
 | `mcp-remote` připnutý na 0.14.3 | most pro Claude Desktop |
 | Allowlist hostitelů, kontrola připnutých verzí a vzorů secrets v CI (`scripts/check_repo.py`, gitleaks) | repo |
 | Instalátor při konfliktu nevypisuje existující konfiguraci se secrets a náhradu vyžaduje povolit přes `--force` | instalátor Claude Desktopu, regresní test |
+| Instalátor odmítne neplatnou konfiguraci bez výpisu obsahu, zapisuje konfiguraci i zálohu s oprávněním `0600` a symlink zachová zápisem do jeho cíle | instalátor Claude Desktopu, regresní testy |
 
 ## Co ochrany nepokrývají
 
@@ -52,7 +53,7 @@ Na tvém stroji: odhlášení podle [README](README.md#odhlášení-a-odebrání
 Na serveru — správce Medplumu v Coolify, resource `medplum` (projekt `dokturek-EHR`):
 
 - Vypnout MCP pro všechny: `MEDPLUM_MCP_ENABLED=false` a redeploy. Server pak endpoint `/mcp` nepřipojí.
-- Zablokovat jednoho klienta: odebrat ho z `MEDPLUM_DEFAULT_OAUTH_CLIENTS` a redeploy. Nová přihlášení přes něj selžou, už vydané access tokeny platí do vypršení (1 hodina).
+- Zablokovat jednoho klienta: odebrat ho z `MEDPLUM_DEFAULT_OAUTH_CLIENTS` a redeploy. Nová přihlášení přes něj selžou, už vydané access tokeny platí do vypršení (1 hodina). Klient `dokturek-claude-code-dev` sdílí Claude Code, most pro Claude Desktop i diagnostika `mcp-smoke`; jeho zablokování vypne všechny tři.
 - Odvolat relace konkrétního uživatele: zneplatnit jeho `Login` zdroje v Medplumu.
 
 ## Vlastník a revize
@@ -61,4 +62,5 @@ Na serveru — správce Medplumu v Coolify, resource `medplum` (projekt `dokture
 - Poslední revize: 2026-10-24 — Medplum 5.2.1, mcp-remote 0.14.3, Claude Code 2.1.310, Codex CLI 0.163.0. Scope bez `offline_access` kvůli chybě refresh flow v Medplumu.
 - Revize hooku: 2026-11-22 — verze 0.2.0: matcher na všechny nástroje Medplum MCP, zamítnutí úniku z `/fhir/R4/`, potvrzení citlivých čtení a neznámých nástrojů, fail closed i při nefunkčním `python3`; regresní testy. Server hlásí Medplum 5.2.15, úplná revize proti této verzi zbývá.
 - Revize instalátoru: 2026-11-01 — verze 0.1.1 odstraňuje výpis existující konfigurace při konfliktu; testy používají pouze syntetická data a dočasný soubor.
+- Revize instalátoru a smoke testu: 2026-11-23 — verze 0.2.0: instalátor odmítá neplatnou konfiguraci, zachová symlink a zapisuje s `0600`; `smoke_test.py --e2e` maže log mostu po úspěchu a sonda DCR je popsaná jako jediný záměrný `POST` mimo MCP; upřesněné tvrzení o refresh tokenu; ověřeno `claude plugin validate --strict` na 2.1.330.
 - Revize nejpozději při upgradu Medplumu, změně OAuth klientů, novém klientovi nebo změně verze `mcp-remote`.

@@ -44,7 +44,8 @@ Celé znění je v [docs/safe-usage.md](docs/safe-usage.md). Zkráceně:
 tools/<nástroj>/                  jeden nástroj = jeden adresář (README.md, RISK.md, konfigurace, skripty)
 tools/_template/                  šablona pro nový nástroj
 docs/safe-usage.md                pravidla používání
-scripts/check_repo.py             kontroly repa (allowlist hostitelů, připnuté verze, secrets, struktura)
+scripts/check_repo.py             kontroly repa (allowlist hostitelů a URL, připnuté verze, secrets, struktura)
+scripts/tests/                    unit testy kontrol repa
 ```
 
 ## Nový nástroj

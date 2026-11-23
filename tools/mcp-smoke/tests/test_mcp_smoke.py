@@ -15,9 +15,29 @@ smoke = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(smoke)
 
 CAPABILITY = json.dumps({"resourceType": "CapabilityStatement", "fhirVersion": "4.0.1"})
-DISCOVERY = {"issuer": "synthetic-issuer", "token_endpoint": "synthetic-token-endpoint",
-             "authorization_endpoint": "synthetic-authorization-endpoint",
+MEDPLUM_ORIGIN = "https://" + smoke.MEDPLUM_HOST
+DISCOVERY = {"issuer": "synthetic-issuer", "token_endpoint": MEDPLUM_ORIGIN + "/oauth2/token",
+             "authorization_endpoint": MEDPLUM_ORIGIN + "/oauth2/authorize",
              "code_challenge_methods_supported": ["S256"]}
+# Built at runtime: scripts/check_repo.py rejects lookalikes of *.dokturek.ai written literally.
+FOREIGN = "evil" + ".example"
+HOSTILE_ENDPOINTS = (
+    "http://" + smoke.MEDPLUM_HOST + "/oauth2/token",
+    "https://" + FOREIGN + "/oauth2/token",
+    "https://" + smoke.MEDPLUM_HOST + "." + FOREIGN + "/oauth2/token",
+    "https://" + FOREIGN + "." + smoke.MEDPLUM_HOST + "/oauth2/token",
+    "https://x" + smoke.MEDPLUM_HOST + "/oauth2/token",
+    "https://" + smoke.MEDPLUM_HOST + "@" + FOREIGN + "/oauth2/token",
+    "https://user@" + smoke.MEDPLUM_HOST + "/oauth2/token",
+    "https://" + FOREIGN + "\\@" + smoke.MEDPLUM_HOST + "/oauth2/token",
+    "https://" + smoke.MEDPLUM_HOST + ":8443/oauth2/token",
+    "https://" + smoke.MEDPLUM_HOST + ":notaport/oauth2/token",
+    "https://" + smoke.MEDPLUM_HOST + "/oauth2/token#frag",
+    "https://" + smoke.MEDPLUM_HOST + "\t/oauth2/token",
+    "//" + smoke.MEDPLUM_HOST + "/oauth2/token",
+    "/oauth2/token",
+    "https://[::1/oauth2/token",
+)
 
 
 class DiscoveryTest(unittest.TestCase):
@@ -53,6 +73,65 @@ class DiscoveryTest(unittest.TestCase):
     def test_missing_s256_remains_auth_failure(self):
         meta = dict(DISCOVERY, code_challenge_methods_supported=["plain"])
         self.check_failure(json.dumps(meta).encode(), 2)
+
+
+class OAuthEndpointTest(unittest.TestCase):
+    """A tampered discovery document must not receive the stored refresh token or the code."""
+
+    def run_with_discovery(self, meta, stored="synthetic-stored-refresh"):
+        output = io.StringIO()
+        with patch.object(smoke, "http_request", return_value=(200, {}, json.dumps(meta).encode())) as http, \
+                patch.object(smoke, "secret_store_get", return_value=stored) as get, \
+                patch.object(smoke, "secret_store_put") as put, \
+                patch.object(smoke, "authorize_interactive") as authorize, \
+                patch.object(smoke, "McpClient") as client, \
+                patch.object(smoke.sys, "argv", ["mcp-smoke.py", "medplum"]), \
+                contextlib.redirect_stdout(output):
+            code = smoke.main()
+        return code, output.getvalue(), http, get, put, authorize, client
+
+    def test_hostile_endpoints_are_refused_before_any_credential_use(self):
+        for field in ("token_endpoint", "authorization_endpoint"):
+            for value in HOSTILE_ENDPOINTS:
+                with self.subTest(field=field, value=value):
+                    code, output, http, get, put, authorize, client = self.run_with_discovery(
+                        dict(DISCOVERY, **{field: value}))
+                    self.assertEqual(code, 2)
+                    self.assertIn("[FAIL] AUTH", output)
+                    self.assertIn(field, output)
+                    self.assertNotIn("all checks passed", output)
+                    self.assertNotIn("synthetic-stored-refresh", output)
+                    # Only the discovery GET went out; the keychain was never read.
+                    http.assert_called_once_with(smoke.MEDPLUM_DISCOVERY)
+                    get.assert_not_called()
+                    put.assert_not_called()
+                    authorize.assert_not_called()
+                    client.assert_not_called()
+
+    def test_check_accepts_configured_host_only(self):
+        for value in (MEDPLUM_ORIGIN + "/oauth2/token", MEDPLUM_ORIGIN + ":443/oauth2/token",
+                      "https://" + smoke.MEDPLUM_HOST.upper() + "/oauth2/authorize",
+                      MEDPLUM_ORIGIN + "/oauth2/authorize?prompt=login"):
+            with self.subTest(value=value):
+                smoke.check_oauth_endpoint({"token_endpoint": value}, "token_endpoint")
+        for value in HOSTILE_ENDPOINTS:
+            with self.subTest(value=value), self.assertRaises(smoke.SmokeError) as error:
+                smoke.check_oauth_endpoint({"token_endpoint": value}, "token_endpoint")
+            self.assertEqual(error.exception.kind, "AUTH")
+
+    def test_stored_refresh_token_goes_only_to_configured_token_endpoint(self):
+        output = io.StringIO()
+        with patch.object(smoke, "http_request", side_effect=[
+                (200, {}, json.dumps(DISCOVERY).encode()),
+                (200, {}, json.dumps({"access_token": "synthetic-access"}).encode())]) as http, \
+                patch.object(smoke, "secret_store_get", return_value="synthetic-stored-refresh"), \
+                patch.object(smoke, "authorize_interactive") as authorize, \
+                contextlib.redirect_stdout(output):
+            tokens, _, error = smoke.medplum_token(SimpleNamespace(no_store=False, check_refresh=False))
+        self.assertIsNone(error)
+        self.assertEqual(tokens, {"access_token": "synthetic-access"})
+        self.assertEqual(http.call_args_list[1].args[0], DISCOVERY["token_endpoint"])
+        authorize.assert_not_called()
 
 
 class TokenResponseTest(unittest.TestCase):

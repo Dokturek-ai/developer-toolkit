@@ -14,7 +14,7 @@ Než začneš, přečti [RISK.md](RISK.md). Nástroj umí i mazat.
 ## Předpoklady
 
 - Účet v Medplumu dev-pre-production (přihlášení na `app.test.dokturek.ai`).
-- Claude Code s podporou pluginů. Plugin prošel `claude plugin validate --strict` na 2.1.290 a 2.1.310.
+- Claude Code s podporou pluginů. Plugin prošel `claude plugin validate --strict` na 2.1.290, 2.1.310 a 2.1.330.
 - Pro hook, který hlídá zápisy, `sh` a `python3` (macOS a Linux). Bez `python3` se hook ptá u každého volání.
 - Pro Claude Desktop Node.js (`npx`) a `python3`.
 - Pro Codex Codex CLI (konfigurace odpovídá verzi 0.163.0).
@@ -80,6 +80,12 @@ Most ukládá tokeny do `~/.mcp-auth/`. Most i Claude Code používají callback
 
 Instalátor ve verzi 0.1.1 při odlišné existující konfiguraci nevypisuje její obsah, který může obsahovat secrets. Náhradu musíš výslovně povolit přepínačem `--force`; bez něj se konfigurace nezmění ani s `--apply`.
 
+Od verze 0.2.0 instalátor:
+
+- odmítne neplatný JSON, JSON, který není objekt, i `mcpServers`, které není objekt. Vypíše srozumitelnou chybu bez obsahu souboru, skončí kódem 4 a nic nezapíše,
+- u konfigurace, která je symlink (např. z dotfiles), zapíše do cíle symlinku a symlink zachová; zálohu vytvoří vedle cíle. Symlink na neexistující soubor odmítne,
+- zapíše konfiguraci i zálohu s oprávněním `0600`.
+
 ### Codex
 
 1. Přidej do `~/.codex/config.toml` obsah [`clients/codex.toml`](clients/codex.toml). Pokud už máš sekci `[mcp_servers.dokturek-medplum-dev]`, uprav ji na místě. Ukázka obsahuje URL serveru i nastavení OAuth callbacku.
@@ -117,7 +123,9 @@ Pokud už máš v aplikaci připojení Doktůrek Medplum, přihlas se přes něj
 
    Výsledek je `Bundle` typu `searchset` s vyplněným `total`.
 
-Smoke test posílá jen čtecí požadavky. `--e2e` se přihlašuje přes most, takže token skončí v `~/.mcp-auth/` stejně jako u Claude Desktopu a Claude Desktop ho pak hodinu používá.
+Smoke test FHIR data jen čte. Jedinou záměrnou výjimkou z pravidla „jen `GET`“ je sonda DCR: `POST /oauth2/register` bez tokenu pro každou očekávanou callback URL. Medplum při ní nic neregistruje, jen podle callback URL vrátí existujícího klienta. Další `POST` jde jen na MCP endpoint jako JSON-RPC (`initialize` bez tokenu, s `--e2e` přes most `initialize`, `tools/list` a `tools/call` s `GET`).
+
+`--e2e` se přihlašuje přes most, takže token skončí v `~/.mcp-auth/` stejně jako u Claude Desktopu a Claude Desktop ho pak hodinu používá. Log mostu v dočasném adresáři skript po úspěšném běhu smaže. Při chybě ho nechá pro diagnostiku a vypíše cestu; po přečtení ho smaž.
 
 ## Řešení problémů
 
@@ -127,7 +135,7 @@ Smoke test posílá jen čtecí požadavky. `--e2e` se přihlašuje přes most, 
 | Prohlížeč hlásí `Invalid redirect URI` | Klient poslal callback, který server nezná | Zkontroluj port 1458 (Claude) nebo 1457 (Codex). Kdo port drží: `lsof -nP -iTCP:1458 -sTCP:LISTEN` |
 | Server se v Claude Desktopu nespustí | Desktop nenajde `npx` | Spusť instalační skript znovu, nastaví absolutní cestu |
 | Po hodině je potřeba nové přihlášení | Známé omezení Medplumu, viz níže | Přihlas se znovu (`/mcp`, restart Claude Desktopu, `codex mcp login`) |
-| Most v Claude Desktopu nebo `smoke_test.py --e2e` padá s `Invalid client` | V `~/.mcp-auth/` zůstal refresh token ze starší konfigurace | Přesuň `~/.mcp-auth/mcp-remote-v1/13e0418b9b881fb80d3e1bb146eebf29_tokens.json` do koše a restartuj Desktop |
+| Most v Claude Desktopu nebo `smoke_test.py --e2e` padá s `Invalid client` | V `~/.mcp-auth/` zůstal refresh token ze starší konfigurace, která žádala `offline_access` (současná šablona ho nežádá) | Přesuň `~/.mcp-auth/mcp-remote-v1/13e0418b9b881fb80d3e1bb146eebf29_tokens.json` do koše a restartuj Desktop |
 | Instalační skript skončí s „Claude Desktop běží“ | Desktop by změnu přepsal | Ukonči Desktop (Cmd+Q) a spusť skript znovu |
 | Hook zamítl `fhir-request` s hláškou „může opustit /fhir/R4/“ | `path` je absolutní URL nebo obsahuje `..` či kódovaný znak; server sám takovou cestu neodmítne (viz RISK.md) | Použij cestu relativní k `/fhir/R4/` |
 
@@ -135,7 +143,7 @@ Smoke test posílá jen čtecí požadavky. `--e2e` se přihlašuje přes most, 
 
 U výchozích OAuth klientů z `MEDPLUM_DEFAULT_OAUTH_CLIENTS` se na Medplumu 5.2.15 bez opravy podařilo lokálně reprodukovat chybu obnovy tokenu `Invalid client`. Oprava je v `dokturek-medplum`. Její nasazení a obnova relace v připojené aplikaci zatím zůstávají neověřené. [Oprava a ověření](https://github.com/Dokturek-ai/dokturek-medplum/pull/40)
 
-Pro běžné připojení přes toolkit používej scope `openid profile`. Po vypršení access tokenu se přihlas znovu. Pokud most `mcp-remote` použije starý refresh token a vrátí `Invalid client`, postupuj podle tabulky výše.
+Konfigurace v tomto nástroji (Claude Code plugin i ruční, most pro Claude Desktop, Codex) žádají scope `openid profile` bez `offline_access`. Po vypršení access tokenu se přihlas znovu. Pokud most `mcp-remote` použije starý refresh token z dřívější konfigurace a vrátí `Invalid client`, postupuj podle tabulky výše. Diagnostický skript [`mcp-smoke`](../mcp-smoke/README.md) naopak `offline_access` žádá a refresh token ukládá do macOS Keychainu nebo libsecret, ne do `~/.mcp-auth/`.
 
 ## Odhlášení a odebrání
 
@@ -154,11 +162,11 @@ Smazání tokenu na disku nezneplatní relaci na serveru. Při podezření na ú
 | Medplum | `5.2.15-4d86215`, verze hlášená testovacím serverem 19. 11. 2026 |
 | OAuth | authorization code + PKCE (S256), veřejní klienti bez secretu |
 | Scope | `openid profile` |
-| Platnost access tokenu | 1 hodina, refresh token se nepoužívá (viz Známé omezení) |
+| Platnost access tokenu | 1 hodina; konfigurace toolkitu nežádá `offline_access` a refresh token nepoužívá (viz Známé omezení) |
 
 | Client ID | Redirect URI | Používá |
 |---|---|---|
-| `dokturek-claude-code-dev` | `http://localhost:1458/callback`, `http://127.0.0.1:1458/callback` | Claude Code, most pro Claude Desktop |
+| `dokturek-claude-code-dev` | `http://localhost:1458/callback`, `http://127.0.0.1:1458/callback` | Claude Code, most pro Claude Desktop, diagnostika `mcp-smoke` |
 | `dokturek-claude-desktop-dev` | `https://claude.ai/api/mcp/auth_callback`, `https://claude.com/api/mcp/auth_callback` | konektor v claude.ai |
 | `dokturek-codex-dev` | `http://127.0.0.1:1457/callback/uAEkM6bonMJI` | Codex |
 

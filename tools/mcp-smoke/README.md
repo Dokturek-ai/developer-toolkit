@@ -11,7 +11,7 @@
 | Server | URL | Transport | Autentizace |
 |---|---|---|---|
 | Coolify self-hosted | `https://coolify.infra.dokturek.ai/mcp` | Streamable HTTP | `Authorization: Bearer <COOLIFY_API_TOKEN>` |
-| Medplum dev | `https://medplum.test.dokturek.ai/mcp/stream` | Streamable HTTP, bezstavový (bez `Mcp-Session-Id`) | OAuth 2.0 Authorization Code + PKCE S256. Pro běžné připojení přes toolkit `openid profile`. |
+| Medplum dev | `https://medplum.test.dokturek.ai/mcp/stream` | Streamable HTTP, bezstavový (bez `Mcp-Session-Id`) | OAuth 2.0 Authorization Code + PKCE S256. Pro běžné připojení přes toolkit `openid profile`; skript `mcp-smoke.py` žádá navíc `offline_access` (§5). |
 
 Odpovědi z 29. 10. 2026 bez tokenu [Z]:
 
@@ -82,16 +82,18 @@ Skript potřebuje jen standardní knihovnu Pythonu 3.9+ (systémový `python3` n
 | Cíl | Postup |
 |---|---|
 | `coolify` | Token vezme z `$COOLIFY_API_TOKEN`, jinak ze sekce `[mcp_servers.coolify-selfhosted.http_headers]` v `~/.codex/config.toml`. Pak `initialize` → `notifications/initialized` → `tools/list` → `get_current_team` a `get_infrastructure_overview`. |
-| `medplum` | Discovery (kontrola `S256`) → přihlášení v prohlížeči (Authorization Code + PKCE S256, `state`, kontrola `iss`) → výměna kódu → refresh token do macOS Keychainu (`security -i`, hodnota nejde přes argv), na Linuxu do libsecret → handshake → `fhir-request GET metadata`. Pro srovnání s N1 zavolá i `GET /fhir/R4/metadata`, to jen jako varování. |
+| `medplum` | Discovery (kontrola `S256` a toho, že `token_endpoint` i `authorization_endpoint` míří přes `https` přesně na `medplum.test.dokturek.ai`) → přihlášení v prohlížeči (Authorization Code + PKCE S256, scope `openid profile offline_access`, `state`, kontrola `iss`) → výměna kódu → refresh token do macOS Keychainu (`security -i`, hodnota nejde přes argv), na Linuxu do libsecret → handshake → `fhir-request GET metadata`. Pro srovnání s N1 zavolá i `GET /fhir/R4/metadata`, to jen jako varování. |
 
 Rozlišení chyb (návratový kód):
 
 | Třída | Kód | Kdy |
 |---|---|---|
-| `AUTH` | 2 | HTTP 401/403 (s `WWW-Authenticate`), chyba token endpointu, nesoulad `state` nebo `iss`, chybějící token |
+| `AUTH` | 2 | HTTP 401/403 (s `WWW-Authenticate`), chyba token endpointu, OAuth endpoint z discovery mimo `https://medplum.test.dokturek.ai`, nesoulad `state` nebo `iss`, chybějící token |
 | `TRANSPORT` | 3 | DNS, TLS, spojení, timeout; HTTP mimo 200/202 (404, 406, 5xx); neplatná JSON-RPC obálka nebo struktura používaných polí výsledku; chybějící odpověď v SSE |
 | `PROTOCOL` | 4 | JSON-RPC objekt `error` (například `-32603`, `-32602`) |
 | `TOOL` | 5 | `result.isError: true`, nástroj chybí v `tools/list` nebo povinné FHIR metadata nejsou JSON objekt typu `CapabilityStatement` |
+
+Na rozdíl od konfigurací v `medplum-mcp` (Claude Code, most pro Claude Desktop i Codex žádají jen `openid profile`) skript žádá scope `offline_access`, aby `--check-refresh` mohl ověřit obnovu tokenu. Vydaný refresh token uloží do macOS Keychainu nebo libsecret, nikdy ne do `~/.mcp-auth/`. S `--no-store` ho nečte ani neuloží. Skript používá stejného OAuth klienta `dokturek-claude-code-dev` jako Claude Code a most pro Claude Desktop v `medplum-mcp`. Zablokování nebo změna tohoto klienta na serveru proto zasáhne obojí.
 
 Skript je ověřený proti lokální replice Medplum MCP (SDK 1.30.1) a Coolify [Z]. Rozlišil platný token, `401` jako `AUTH`, odmítnuté spojení jako `TRANSPORT` a výjimku i neznámý nástroj jako `TOOL`.
 
@@ -102,6 +104,8 @@ Opravy z 1. 11. 2026 přidávají stejné varování i pro druhé uložení toke
 Oprava z 2. 11. 2026 vyžaduje právě jedno z polí `result` a `error`: výsledek musí být objekt, chyba musí mít celočíselný `code` a textový `message`. Handshake kontroluje typy povinných polí a seznam nástrojů. `tools/call` vyžaduje pole `content`, objekty s textovým `type`, textový `text` u textových bloků a případné boolean `isError`. Vadné tvary skončí `TRANSPORT` / 3 místo pádu nebo falešného `OK`. Platné prázdné `content: []` zůstává povolené; platné chyby serveru a nástroje zachovávají kódy 4 a 5. Syntetické regresní testy pokrývají JSON i SSE. Jde o kontrolu polí používaných diagnostikou, nikoli úplnou validaci všech vnořených MCP schémat.
 
 Token endpoint musí vrátit JSON objekt a při HTTP 200 neprázdný textový `access_token`. Pokud odpověď obsahuje `refresh_token`, musí být také neprázdný text; jeho vynechání zůstává povolené. Vadný tvar skončí `TRANSPORT` / 3; při obnově uloženého tokenu se místo pádu spustí přihlášení v prohlížeči. Chybová OAuth odpověď v objektu při HTTP mimo 200 dál končí `AUTH` / 2. Syntetické regresní testy ověřují i tento fallback a zachování prvního tokenu při vadné odpovědi na `--check-refresh`.
+
+Oprava z 23. 11. 2026: `token_endpoint` a `authorization_endpoint` z OAuth discovery musí mít schéma `https`, přesně hostitele `medplum.test.dokturek.ai` a výchozí port 443, bez userinfo, fragmentu, zpětného lomítka a bílých či řídicích znaků. Jinak skript skončí `AUTH` / 2 dřív, než přečte uložený refresh token, takže ho ani autorizační kód nepošle jinam. Syntetické regresní testy pokrývají podvržené hostitele (cizí doména přidaná za `medplum.test.dokturek.ai` nebo před něj), `http://`, userinfo, jiný port a relativní URL a ověřují, že se úložiště tokenů vůbec nečte.
 
 Souhrnný výpis FHIR metadat uvádí pouze typ zdroje a `fhirVersion`. Volitelné pole `software` nečte, takže jeho nečekaný tvar neshodí povinnou ani diagnostickou cestu. Kontrola tím není úplnou validací FHIR zdroje.
 
