@@ -20,4 +20,4 @@ Když unikl token, nestačí ho smazat z disku. Nech vlastníka zneplatnit relac
 
 ## Hlášení zranitelnosti
 
-Napiš vlastníkovi nástroje. Uveď nástroj a verzi (`version` v `plugin.json`), klienta a jeho verzi, co se stalo a kdy. Nepřikládej tokeny ani data.
+Napiš vlastníkovi nástroje. Uveď nástroj a verzi (`version` v `plugin.json`, u nástroje bez pluginu commit), klienta a jeho verzi, co se stalo a kdy. Nepřikládej tokeny ani data.

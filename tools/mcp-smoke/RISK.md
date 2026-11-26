@@ -53,7 +53,7 @@ OAuth klient `dokturek-claude-code-dev` sdílí skript s Claude Code a mostem pr
 ## Vlastník a revize
 
 - Vlastník: Petr Sovadina (@petrsovadina).
-- Poslední revize: 2026-10-30 — Petr výslovně schválil přidání `coolify.infra.dokturek.ai` do allowlistu pro stávající MCP diagnostiku. Samostatný bezpečnostní commit mění pouze allowlist a tento popis rizik; nemění prostředí ani oprávnění serveru.
+- Výchozí revize: 2026-10-30 — Petr výslovně schválil přidání `coolify.infra.dokturek.ai` do allowlistu pro stávající MCP diagnostiku. Samostatný bezpečnostní commit mění pouze allowlist a tento popis rizik; nemění prostředí ani oprávnění serveru.
 - Opravy skriptu: 2026-10-30 — povinná kontrola FHIR metadat a ukládání rotovaného refresh tokenu, včetně regresních testů bez živých přístupů.
 - Revize oprav: 2026-11-01 — varování při druhém uložení tokenu, validace OAuth discovery a ID odpovědí JSON/SSE včetně boolean hodnot; ověřeno syntetickými testy.
 - Revize oprav: 2026-11-02 — validace JSON-RPC `result`/`error` a používaných polí MCP výsledků; regresní testy pro neplatné odpovědi i zachování návratových kódů platných odpovědí.

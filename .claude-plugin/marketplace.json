@@ -6,12 +6,12 @@
     "url": "https://github.com/Dokturek-ai"
   },
   "description": "Vývojářské nástroje core týmu Doktůrek.ai s přístupem k datům a k Medplumu. Není to běžný marketplace — před použitím čti README.md a RISK.md nástroje.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "plugins": [
     {
       "name": "medplum-mcp",
-      "description": "MCP přístup k Medplum FHIR API v prostředí dev-pre-production přes osobní OAuth přihlášení. Čtení i zápis; každý zápis vyžaduje potvrzení.",
-      "version": "0.2.0",
+      "description": "MCP přístup k Medplum FHIR API v prostředí dev-pre-production přes osobní OAuth přihlášení. Jen pro syntetická data. Čtení i zápis; každý zápis, citlivé čtení a neznámý nástroj vyžaduje potvrzení.",
+      "version": "0.2.1",
       "author": {
         "name": "Doktůrek.ai"
       },

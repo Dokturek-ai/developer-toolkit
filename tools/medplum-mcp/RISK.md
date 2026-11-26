@@ -59,8 +59,8 @@ Na serveru — správce Medplumu v Coolify, resource `medplum` (projekt `dokture
 ## Vlastník a revize
 
 - Vlastník: Petr Sovadina (@petrsovadina)
-- Poslední revize: 2026-10-24 — Medplum 5.2.1, mcp-remote 0.14.3, Claude Code 2.1.310, Codex CLI 0.163.0. Scope bez `offline_access` kvůli chybě refresh flow v Medplumu.
+- Výchozí revize: 2026-10-24 — Medplum 5.2.1, mcp-remote 0.14.3, Claude Code 2.1.310, Codex CLI 0.163.0. Scope bez `offline_access` kvůli chybě refresh flow v Medplumu.
 - Revize hooku: 2026-11-22 — verze 0.2.0: matcher na všechny nástroje Medplum MCP, zamítnutí úniku z `/fhir/R4/`, potvrzení citlivých čtení a neznámých nástrojů, fail closed i při nefunkčním `python3`; regresní testy. Server hlásí Medplum 5.2.15, úplná revize proti této verzi zbývá.
 - Revize instalátoru: 2026-11-01 — verze 0.1.1 odstraňuje výpis existující konfigurace při konfliktu; testy používají pouze syntetická data a dočasný soubor.
 - Revize instalátoru a smoke testu: 2026-11-23 — verze 0.2.0: instalátor odmítá neplatnou konfiguraci, zachová symlink a zapisuje s `0600`; `smoke_test.py --e2e` maže log mostu po úspěchu a sonda DCR je popsaná jako jediný záměrný `POST` mimo MCP; upřesněné tvrzení o refresh tokenu; ověřeno `claude plugin validate --strict` na 2.1.330.
-- Revize nejpozději při upgradu Medplumu, změně OAuth klientů, novém klientovi nebo změně verze `mcp-remote`.
+- Revize nejpozději při upgradu Medplumu, změně OAuth klientů, novém klientovi nebo změně verze `mcp-remote`. Upgrade na Medplum 5.2.15 proběhl 9. 11. 2026; úplná revize proti této verzi zatím neproběhla.

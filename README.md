@@ -3,16 +3,16 @@
 Vývojářské nástroje core týmu Doktůrek.ai, které sahají na data — hlavně na Medplum. MCP servery, konfigurace agentů a pomocné skripty pro Claude Code, Claude Desktop a Codex.
 
 > [!WARNING]
-> Tohle není marketplace pluginů. Každý nástroj tady má přístup k datům, některé i k zápisu. Nepoužívej nástroj, dokud nepřečteš jeho `README.md` a `RISK.md` a nevyzkoušíš ho lokálně podle návodu.
+> Tohle není běžný marketplace pluginů. Každý nástroj tady má přístup k datům, některé i k zápisu. Nepoužívej nástroj, dokud nepřečteš jeho `README.md` a `RISK.md` a nevyzkoušíš ho lokálně podle návodu.
 
-Obecné pluginy a skilly bez přístupu k datům patří do [plugin-marketplace-healthcare-dev](https://github.com/Dokturek-ai/plugin-marketplace-healthcare-dev). Toolkit je oddělený záměrně: jiné riziko, jiná pravidla, přísnější review.
+Obecné pluginy a skilly bez přístupu k datům patří do [plugin-marketplace-healthcare-dev](https://github.com/Dokturek-ai/plugin-marketplace-healthcare-dev) (vývoj EHR) nebo do [knowledge-work-plugins](https://github.com/Dokturek-ai/knowledge-work-plugins) (práce mimo vývoj). Toolkit je oddělený záměrně: jiné riziko, jiná pravidla, přísnější review.
 
 ## Nástroje
 
 | Nástroj | Co dělá | Prostředí | Zápis do dat | Klienti |
 |---|---|---|---|---|
 | [`medplum-mcp`](tools/medplum-mcp/) | MCP přístup k Medplum FHIR API | dev-pre-production | ano, v Claude Code s potvrzením | Claude Code, Claude Desktop, Codex |
-| [`mcp-smoke`](tools/mcp-smoke/) | Nastavení agentů a samostatná MCP diagnostika; živé ověření zbývá | Medplum dev, Coolify infra | skript jen čte; připojení agentů podle oprávnění účtu | Python 3.9+, návody pro osobní agenty |
+| [`mcp-smoke`](tools/mcp-smoke/) | Nastavení agentů a samostatná MCP diagnostika; živé ověření skriptu zbývá (k 25. 11. 2026) | Medplum dev, Coolify infra | skript jen čte; připojení agentů podle oprávnění účtu | Python 3.9+, návody pro osobní agenty |
 
 Každý nástroj má `README.md` (nastavení, ověření, odhlášení) a `RISK.md` (k čemu má přístup, co může pokazit, jak ho vypnout).
 
