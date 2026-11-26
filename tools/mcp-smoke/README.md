@@ -4,7 +4,7 @@
 
 > Původní síťové sondy v tomto návodu jsou z 29. 10. 2026. Dne 19. 11. 2026 vrátil připojený testovací konektor v aplikaci FHIR metadata s verzí `5.2.15-4d86215`, počet číselníků přes `fhir-request` a zástupný dokument přes `search`. Samostatný skript i obnova relace v aplikaci čekají na ověření s reálnými přístupy (§6).
 > **Značky:** [Z] zjištěno (kód, odpověď serveru, test), [N] neověřeno, [P] návrh.
-> **Zdroje:** Medplum `v5.2.1` (`e0db1fc`, stejný build hlásí `/healthcheck`), `@modelcontextprotocol/sdk` 1.30.1 (verze pinovaná v Medplum serveru), `Dokturek-ai/dokturek-medplum` `18b53e7` (`integrations/openai/`), Claude Code 2.1.312.
+> **Zdroje:** Medplum `v5.2.1` (`e0db1fc`, build hlášený `/healthcheck` k 29. 10. 2026; od 9. 11. 2026 server hlásí `5.2.15-4d86215`), `@modelcontextprotocol/sdk` 1.30.1 (verze pinovaná v Medplum serveru), `Dokturek-ai/dokturek-medplum` `18b53e7` (`integrations/openai/`), Claude Code 2.1.312.
 
 ## 1. Servery
 
@@ -21,12 +21,12 @@ Odpovědi z 29. 10. 2026 bez tokenu [Z]:
 
 ## 2. OAuth klienti Medplum dev
 
-Medplum 5.2.1 při DCR (`/oauth2/register`) nic neregistruje. Podle první `redirect_uri` jen vyhledá klienta v `MEDPLUM_DEFAULT_OAUTH_CLIENTS` (`packages/server/src/oauth/register.ts`). Seznam je v `dokturek-medplum/integrations/openai/oauth-clients.dev.json`:
+Medplum 5.2.1 při DCR (`/oauth2/register`) nic neregistruje; kód `register.ts` ve verzi 5.2.15 se chová stejně. Podle první `redirect_uri` jen vyhledá klienta v `MEDPLUM_DEFAULT_OAUTH_CLIENTS` (`packages/server/src/oauth/register.ts`). Seznam je v `dokturek-medplum/integrations/openai/oauth-clients.dev.json`:
 
 | Agent | `client_id` | Přesná callback URL |
 |---|---|---|
 | Claude Code | `dokturek-claude-code-dev` | `http://localhost:1458/callback` (povolená je i `http://127.0.0.1:1458/callback`) |
-| Claude Desktop / claude.ai | `dokturek-claude-desktop-dev` | `https://claude.ai/api/mcp/auth_callback`, `https://claude.com/api/mcp/auth_callback` |
+| Konektor claude.ai (i v Claude Desktopu) | `dokturek-claude-desktop-dev` | `https://claude.ai/api/mcp/auth_callback`, `https://claude.com/api/mcp/auth_callback` |
 | Codex CLI | `dokturek-codex-dev` | `http://127.0.0.1:1457/callback/uAEkM6bonMJI` |
 | ChatGPT | `dokturek-chatgpt-dev` | `https://chatgpt.com/connector/oauth/nSvqXqv_vpdT` |
 
@@ -130,3 +130,7 @@ Očekávaný výsledek:
 - Pokud se vrátí `PROTOCOL -32603`, zaznamenej čas a dostupné ID požadavku a porovnej je s logy serveru a konektoru.
 
 V cloudové session 29. 10. nebyl k dispozici `COOLIFY_API_TOKEN` ani přihlášení do Medplumu v prohlížeči. Proto se volání nástrojů s reálnými tokeny zatím neprovedla [N].
+
+## 7. Odhlášení a odebrání
+
+Uložený refresh token Medplumu, token Coolify a připojení osobních agentů odstraníš podle [RISK.md → Vypnutí a odvolání přístupu](RISK.md#vypnutí-a-odvolání-přístupu). Most pro Claude Desktop v `medplum-mcp` používá klienta `dokturek-claude-code-dev`, ne `dokturek-claude-desktop-dev`.

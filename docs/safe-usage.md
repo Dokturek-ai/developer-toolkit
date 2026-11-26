@@ -4,7 +4,7 @@ Nástroje z toolkitu pracují s daty a s oprávněními tvého účtu. Tahle pra
 
 ## Prostředí a data
 
-Nástroje míří na testovací prostředí (dev-pre-production). Klinický produkční endpoint v toolkitu není a `scripts/check_repo.py` v CI odmítne každého hostitele `*.dokturek.ai` mimo allowlist, jeho podvržené tvary a v konfiguraci i kódu každou URL na neschváleného hostitele. Allowlist ale obsahuje Coolify (`coolify.infra.dokturek.ai`), který spravuje i produkční služby; pracuj s ním jen přes `mcp-smoke` a s tokenem, který smí jen číst.
+Nástroje míří na testovací prostředí (dev-pre-production). Klinický produkční endpoint v toolkitu není a `scripts/check_repo.py` v CI odmítne každého hostitele `*.dokturek.ai` mimo allowlist, jeho podvržené tvary a v konfiguraci i kódu každou URL na neschváleného hostitele. Allowlist ale obsahuje Coolify (`coolify.infra.dokturek.ai`), který spravuje i produkční služby; pracuj s ním jen podle návodu `mcp-smoke` a s tokenem, který smí jen číst.
 
 V testovacím prostředí pracuj jen se syntetickými daty. Když narazíš na data, která vypadají jako skutečná data pacientů, nástroj dál nepoužívej a dej vědět vlastníkovi nástroje.
 
@@ -22,7 +22,7 @@ Nástroj má stejná oprávnění jako tvůj účet, včetně zápisu a mazání
 
 Zápisy potvrzuješ ručně, u každého volání:
 
-- Claude Code plugin to vynucuje hookem — u každého zápisu se tě zeptá.
+- Claude Code plugin to vynucuje hookem — u každého zápisu se tě zeptá. Výjimkou je timeout hooku (20 s), viz [RISK.md](../tools/medplum-mcp/RISK.md#co-ochrany-nepokrývají).
 - V Claude Desktopu a v Codexu hook není. Nepovoluj zápisový nástroj trvale a potvrzuj každé volání.
 
 Než potvrdíš, přečti si metodu a cestu. Hook se zeptá, ale operaci neposoudí — co potvrdíš, to se provede.
